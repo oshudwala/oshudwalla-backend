@@ -1,4 +1,4 @@
-# State Machines (Phase 3 draft)
+# State Machines (Phase 3 design v2)
 
 All transitions are enforced by one central transition table per entity inside the service layer. Any transition not listed is rejected. Every transition runs inside a DB transaction, uses a conditional update (`WHERE status = <expected>`), writes a status-history row, and emits an outbox event.
 
@@ -35,7 +35,7 @@ stateDiagram-v2
 
 | From | To | Actor | Guard |
 |---|---|---|---|
-| PENDING_PHARMACY_REVIEW | ACCEPTED | Pharmacist of that pharmacy | All `requiresPrescription` items have a verified prescription |
+| PENDING_PHARMACY_REVIEW | ACCEPTED | Pharmacist of that establishment (PHARMACY service ACTIVE) | All `requiresPrescription` items have a verified prescription |
 | PENDING_PHARMACY_REVIEW | REJECTED | Pharmacist | Reason required; stock reservation released; coupon and coins refunded |
 | PENDING_PHARMACY_REVIEW | AWAITING_CUSTOMER_CONFIRMATION | Pharmacist | Updated quotation stored; customer notified |
 | AWAITING_CUSTOMER_CONFIRMATION | ACCEPTED | Patient (owner) | Within confirmation window |
@@ -92,17 +92,20 @@ Mapping between delivery and order status:
 
 ## 5. Prescription
 ```
-SUBMITTED -> CLINIC_REVIEW (clinic selected) -> FORWARDED_TO_PHARMACY
-SUBMITTED -> PHARMACY_VERIFYING (no clinic: Primary Pharmacy)
+SUBMITTED -> CLINIC_REVIEW (establishment chosen and its clinic review is required) -> FORWARDED_TO_PHARMACY
+SUBMITTED -> PHARMACY_VERIFYING (no establishment chosen: Primary Pharmacy; or chosen establishment has a PHARMACY service and no clinic review is required)
 FORWARDED_TO_PHARMACY -> PHARMACY_VERIFYING
 PHARMACY_VERIFYING -> AWAITING_CUSTOMER_CONFIRMATION -> VERIFIED
 PHARMACY_VERIFYING -> VERIFIED | REJECTED
 any non-final -> CANCELLED (patient) | EXPIRED (system)
 ```
-Open question for the clinic path: after clinic review, does the Super Admin choose the pharmacy (your Workflow 3 lists "Super Admin" between Clinic Review and Pharmacy Verification), or does the system forward to the clinic's own pharmacy / the Primary Pharmacy automatically? The schema supports both.
+Routing with the unified Establishment (see `ESTABLISHMENT.md` section 6): if the chosen establishment has an ACTIVE PHARMACY service, the same establishment verifies; if it is clinic-only, Super Admin chooses the pharmacy after clinic review (open question 4: or auto-forward to the Primary Pharmacy). `CLINIC_REVIEW` means review under the clinic service; `FORWARDED_TO_PHARMACY` means routed to a pharmacy service.
 
 ## 6. Appointment
 `BOOKED -> CHECKED_IN -> IN_CONSULTATION -> COMPLETED`; `BOOKED|CHECKED_IN -> CANCELLED`; `BOOKED|CHECKED_IN -> NO_SHOW`. Cancel/no-show frees one slot seat (decrement `bookedCount`) in a locked transaction.
+
+## 6b. Establishment and service
+`Establishment`: `PENDING -> ACTIVE -> SUSPENDED <-> ACTIVE`, `ACTIVE -> CLOSED`. `EstablishmentService`: `PENDING -> ACTIVE -> SUSPENDED <-> ACTIVE`, `ACTIVE|SUSPENDED -> DISABLED` (only when no open appointments, orders or prescriptions). Super Admin approves each transition from PENDING.
 
 ## 7. Withdrawal
 `REQUESTED -> APPROVED -> PAID`; `REQUESTED -> REJECTED`; `REQUESTED -> CANCELLED` (by requester). Request places a HOLD; reject/cancel RELEASEs; payout CAPTURES the hold.

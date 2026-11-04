@@ -54,7 +54,7 @@ It consists of three client experiences served by this single backend:
 | Client | Users |
 |---|---|
 | Customer Website and Mobile App | Patients |
-| Administrative Web Platform | Super Admin, Clinic Admin, Doctor, Pharmacist, Receptionist |
+| Administrative Web Platform (one role-based app) | Super Admin, Establishment Admin, Doctor, Pharmacist, Receptionist |
 | Rider Mobile App | Riders |
 
 This is a paid, industry-level product. Engineering quality targets large e-commerce platforms, adapted to healthcare.
@@ -77,12 +77,13 @@ This is a paid, industry-level product. Engineering quality targets large e-comm
 |---|---|
 | `SUPER_ADMIN` | Whole platform: configuration, rider assignment, settlements, approvals |
 | `PATIENT` | Own profile, addresses, orders, prescriptions, appointments, wallet |
+| `ESTABLISHMENT_ADMIN` | Own establishment(s) only: profile, services, staff, doctors, schedules, wallet (clinic and/or pharmacy service) |
 | `DOCTOR` | Own profile and appointments in clinics they are linked to |
-| `PHARMACIST` | Own pharmacy only: orders, inventory, prescription review |
+| `PHARMACIST` | Pharmacy service of own establishment only: orders, inventory, prescription review |
 | `RIDER` | Own assigned deliveries, earnings, wallet, withdrawals |
-| `RECEPTIONIST` | Own clinic only: appointments, queue, check-in |
+| `RECEPTIONIST` | Clinic service of own establishment only: appointments, queue, check-in |
 
-Authorization has two layers: **RBAC** (what the role may do) and **resource-level authorization** (which records the user may touch). A Clinic Admin, Pharmacist, Rider or Receptionist can never access resources outside their authorized scope.
+Authorization has two layers: **RBAC** (what the role may do) and **resource-level authorization** (which records the user may touch). An Establishment Admin, Pharmacist, Rider or Receptionist can never access resources outside their authorized scope.
 
 ## 4. Complete Features
 
@@ -90,13 +91,13 @@ Authorization has two layers: **RBAC** (what the role may do) and **resource-lev
 Medicine search, product categories, product details, cart, checkout (COD), prescription upload and tracking, doctor search, clinic search, doctor appointment, live queue, order tracking, in-app delivery OTP, referral coins, wallet, coupons, notifications, profile and address management.
 
 ### Administrative Web Platform
-Separate dashboards for Super Admin, Clinic Admin, Doctor, Pharmacist and Receptionist.
+One role-based Administrative Web Platform. Role dashboards: Super Admin, Establishment Admin (sections appear for the clinic and/or pharmacy services the establishment has enabled, no duplicate dashboards), Doctor, Pharmacist and Receptionist.
 
 ### Rider App
 Login, assigned orders, bulk delivery assignment, pickup location, QR scanner, navigation, customer OTP entry, COD collection, delivery history, earnings, wallet, withdrawal.
 
 ### Backend Modules (34 capabilities)
-Authentication and RBAC, users and patients, addresses, super admin, clinics, clinic staff, doctors, specializations, doctor schedules, appointments, live queue, pharmacies, pharmacists, products, categories, pharmacy-specific inventory, prescriptions, cart, orders, riders, delivery, QR pickup verification, in-app delivery OTP, referrals, reward coins, coupons, wallets, withdrawals, settlements, cash collection, notifications, customer support, reports and analytics, audit logs.
+Authentication and RBAC, users and patients, addresses, super admin, unified establishments (one profile that runs a clinic service, a pharmacy service, or both) with staff, doctors, specializations, doctor schedules, appointments, live queue, pharmacists, products, categories, pharmacy-specific inventory, prescriptions, cart, orders, riders, delivery, QR pickup verification, in-app delivery OTP, referrals, reward coins, coupons, wallets, withdrawals, settlements, cash collection, notifications, customer support, reports and analytics, audit logs.
 
 Every module must contain real business logic, not only CRUD endpoints.
 
@@ -143,6 +144,12 @@ Route  ->  Validation (Zod)  ->  Controller  ->  Service  ->  Repository  ->  Pr
 ### 6.4 Reliability Principles
 Idempotent APIs, strict order state machine, atomic financial transactions, transactional stock operations, background job retries, reliable event processing, audit trails, duplicate request prevention.
 
+### 6.5a Unified Establishment
+Clinic and Pharmacy are not separate entities. One `Establishment` (one registration, one profile, one admin team, one dashboard) enables a CLINIC service, a PHARMACY service, or both, each with its own status, licence and settings. Doctors, schedules, appointments, receptionists and queues belong to the clinic service; pharmacists, inventory, prescription verification and medicine orders belong to the pharmacy service; everything links to one `establishmentId`. Details: `docs/ESTABLISHMENT.md`.
+
+### 6.5b Notifications
+Every important event is stored (in-app history), pushed to closed or background apps through Firebase Cloud Messaging (Android directly; iOS through FCM to APNs), and emitted over Socket.IO to open apps. Device tokens support multiple devices, refresh and invalid-token cleanup. BullMQ/Redis jobs retry with backoff; every attempt is logged. Users control preferences. Details, event catalog, limits and test plan: `docs/NOTIFICATIONS.md`.
+
 ### 6.5 Concurrency Controls
 Database transactions, unique constraints, row-level locking (`SELECT ... FOR UPDATE`) where required, and idempotency keys on mutating financial and order APIs. Detailed in the Phase 3 design documents.
 
@@ -154,9 +161,9 @@ oshud-wala-backend/
 │   ├── app.ts            server.ts            routes.ts
 │   ├── config/  middlewares/  utils/  validations/  jobs/  sockets/  docs/
 │   └── modules/
-│       ├── auth  admin  user  patient  address  clinic  clinicStaff  doctor
+│       ├── auth  admin  user  patient  address  establishment  doctor
 │       ├── receptionist  specialization  schedule  appointment  queue
-│       ├── pharmacy  pharmacist  product  category  inventory  prescription
+│       ├── pharmacist  product  category  inventory  prescription
 │       ├── cart  order  rider  delivery  pickupQr  deliveryOtp
 │       ├── referral  coin  coupon  wallet  withdrawal  settlement
 │       └── cashCollection  notification  support  report  audit
@@ -228,7 +235,7 @@ Customer, Medicine Search, Product Details, Cart, Coupon / Referral Coins, COD C
 ### B. Prescription Ordering
 - Customer uploads a prescription.
 - No clinic selected: routed to the Super Admin-configured **Primary Pharmacy**.
-- Clinic selected: routed to that clinic, then follows the configured clinic and pharmacist review steps.
+- Establishment selected: routed to that establishment; if it has a pharmacy service its pharmacist verifies (after a clinic-side review when configured); if it is clinic-only, Super Admin chooses the pharmacy.
 - A pharmacist verifies prescription-dependent medicines per applicable requirements.
 - If customer confirmation or an updated quotation is needed, the order **waits for customer confirmation** before preparation.
 - Prescription files live in private storage and are accessed only through short-lived signed URLs by authorized users.
@@ -312,7 +319,7 @@ The backend records separately:
 
 ## 15. Wallet, Ledger and Settlement
 
-Separate accounts for **Customer, Clinic, Rider and Platform**.
+Separate accounts for **Customer, Establishment, Rider and Platform**.
 
 Supported operations: credit, debit, hold, release, full and partial withdrawal, approval, rejection, cash settlement, commission, transaction history.
 
@@ -345,7 +352,7 @@ Admin-created coupons with validity window, usage limits (global and per user), 
 | Queue | `queue:updated`, `queue:now_serving` |
 | Notification | `notification:new` |
 
-Sockets authenticate with the same JWT. Missed events are recoverable from persistent notifications and REST state endpoints after reconnect. The OTP value is never sent in a socket payload visible to anyone except the owning customer.
+Sockets reach only open apps; closed or background apps are reached by FCM push (see 6.7). Sockets authenticate with the same JWT. Missed events are recoverable from persistent notifications and REST state endpoints after reconnect. The OTP value is never sent in a socket payload visible to anyone except the owning customer.
 
 ## 19. API Versioning and Conventions
 
@@ -370,6 +377,7 @@ Sockets authenticate with the same JWT. Missed events are recoverable from persi
 | Delivery OTP | `DELIVERY_OTP_TTL_SECONDS`, `DELIVERY_OTP_MAX_ATTEMPTS` |
 | QR | `PICKUP_QR_TTL_SECONDS`, `PICKUP_QR_SECRET` |
 | Business | `RIDER_EARNING_PAISE` (default 4000) |
+| Notifications | `NOTIFICATION_PROVIDER` (`fcm` or `log`), `FIREBASE_SERVICE_ACCOUNT_JSON` (secret, server only), `FCM_DRY_RUN` |
 
 Real values go only in an untracked `.env`. `.env.example` contains placeholders only.
 
@@ -428,32 +436,35 @@ Work proceeds step by step, module by module. Every module is: designed, modeled
 
 ## 27. Module Development Order
 
+Revised order (design v2, pending approval; notification core moves up, Clinic and Pharmacy merge into Establishment):
+
 1. Authentication and RBAC
-2. Users and Addresses
-3. Super Admin
-4. Clinic and Clinic Staff
-5. Doctor and Specialization
-6. Schedule
-7. Appointment
-8. Live Queue
-9. Pharmacy and Pharmacist
-10. Product and Category
-11. Inventory
-12. Prescription
-13. Cart
-14. Order
-15. Rider
-16. Delivery and QR Pickup
-17. In-App Delivery OTP
-18. Referral and Coins
-19. Coupon
-20. Wallet
-21. Withdrawal and Settlement
-22. Cash Collection
-23. Notifications
+2. Notification core (devices, history, preferences, fan-out, FCM push worker)
+3. Users and Addresses
+4. Super Admin
+5. Establishment (unified registration, services, staff)
+6. Doctor and Specialization
+7. Schedule
+8. Appointment
+9. Live Queue
+10. Pharmacist and pharmacy service settings
+11. Product and Category
+12. Inventory
+13. Prescription
+14. Cart
+15. Order
+16. Rider
+17. Delivery and QR Pickup
+18. In-App Delivery OTP
+19. Referral and Coins
+20. Coupon
+21. Wallet
+22. Withdrawal and Settlement
+23. Cash Collection
 24. Support
-25. Reports and Analytics
-26. Audit
+25. Notification hardening (broadcast, stats, load and failure tests)
+26. Reports and Analytics
+27. Audit
 
 ## 28. Implementation Status
 
@@ -461,7 +472,7 @@ Work proceeds step by step, module by module. Every module is: designed, modeled
 |---|---|
 | Project folder structure | Created (empty placeholder files) |
 | README and tracking documents | Created |
-| Architecture, ERD, Prisma schema, state machines, ledger design, socket registry, permission matrix | Drafted in `docs/` and `prisma/schema.prisma`; schema passes Prisma syntax validation; **awaiting owner approval**; no migration run |
+| Architecture, ERD, Prisma schema, state machines, ledger design, socket registry, permission matrix, unified Establishment design, notification design | Design v2 drafted in `docs/` and `prisma/schema.prisma` (64 models); schema passes Prisma syntax validation; **awaiting owner approval of v2**; no migration run |
 | Project setup (Express, Prisma, Redis, BullMQ, Socket.IO, Swagger, etc.) | Not started (Phase 4) |
 | Authentication and RBAC | Not started (Phase 5) |
 | All business modules | Not started |

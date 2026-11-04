@@ -1,5 +1,5 @@
 // =====================================================================
-// OSHUD WALA - PRISMA SCHEMA (Phase 3 DESIGN DRAFT - awaiting approval)
+// OSHUD WALA - PRISMA SCHEMA (Phase 3 design v2: unified Establishment + notification system - awaiting approval)
 // Conventions:
 //  - Money is integer PAISE (Int for order/item amounts, BigInt for wallet/ledger).
 //  - UUID primary keys. Tables are snake_case via @@map.
@@ -25,7 +25,7 @@ datasource db {
 enum RoleName {
   SUPER_ADMIN
   PATIENT
-  CLINIC_ADMIN
+  ESTABLISHMENT_ADMIN
   DOCTOR
   PHARMACIST
   RIDER
@@ -51,10 +51,6 @@ enum EntityStatus {
   CLOSED
 }
 
-enum ClinicStaffRole {
-  CLINIC_ADMIN
-  RECEPTIONIST
-}
 
 enum AppointmentStatus {
   BOOKED
@@ -176,7 +172,7 @@ enum OtpStatus {
 
 enum WalletOwnerType {
   CUSTOMER
-  CLINIC
+  ESTABLISHMENT
   RIDER
   PLATFORM
 }
@@ -189,7 +185,7 @@ enum LedgerTxType {
   WITHDRAWAL_RELEASE
   WITHDRAWAL_PAYOUT
   COMMISSION
-  CLINIC_SETTLEMENT_CREDIT
+  ESTABLISHMENT_SETTLEMENT_CREDIT
   REFUND
   ADJUSTMENT
 }
@@ -249,17 +245,6 @@ enum ReferralStatus {
   VOID
 }
 
-enum NotificationType {
-  ORDER
-  DELIVERY
-  PRESCRIPTION
-  APPOINTMENT
-  QUEUE
-  WALLET
-  REFERRAL
-  SUPPORT
-  SYSTEM
-}
 
 enum DevicePlatform {
   ANDROID
@@ -285,11 +270,69 @@ enum OutboxStatus {
   PENDING
   PROCESSED
   FAILED
+  CANCELLED
 }
 
 enum CommissionTarget {
   PHARMACY_ORDER
   APPOINTMENT
+}
+
+// ---- unified establishment enums
+enum ServiceType {
+  CLINIC
+  PHARMACY
+}
+
+enum ServiceStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  DISABLED
+}
+
+enum EstablishmentStaffRole {
+  ADMIN
+  RECEPTIONIST
+  PHARMACIST
+}
+
+// ---- notification enums
+enum NotificationCategory {
+  ORDER
+  DELIVERY
+  PRESCRIPTION
+  APPOINTMENT
+  QUEUE
+  PAYMENT
+  WALLET
+  REFERRAL
+  SUPPORT
+  SECURITY
+  ESTABLISHMENT
+  SYSTEM
+}
+
+enum NotificationPriority {
+  NORMAL
+  HIGH
+}
+
+enum NotificationChannel {
+  PUSH
+  SOCKET
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+  INVALID_TOKEN
+}
+
+enum PushProvider {
+  FCM
 }
 
 // ------------------------- AUTH, RBAC, SESSIONS -----------------------
@@ -349,8 +392,9 @@ model User {
   doctorProfile      DoctorProfile?
   riderProfile       RiderProfile?
   addresses          Address[]
-  clinicStaff        ClinicStaff[]
-  pharmacyStaff      PharmacyStaff[]
+  establishmentStaff EstablishmentStaff[]
+  notificationPreferences NotificationPreference[]
+  notificationSetting NotificationSetting?
   cart               Cart?
   orders             Order[]              @relation("PatientOrders")
   prescriptions      Prescription[]       @relation("PatientPrescriptions")
@@ -387,7 +431,7 @@ model Session {
   revokedReason String?
   createdAt     DateTime       @default(now())
   refreshTokens RefreshToken[]
-
+  deviceTokens DeviceToken[]
   @@index([userId, revokedAt])
   @@map("sessions")
 }
@@ -461,18 +505,26 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+// Transactional outbox. Also stores scheduled work (appointment reminders) via availableAt, so the
+// schedule survives a Redis flush. dedupeKey makes enqueueing idempotent; (aggregateType, aggregateId)
+// lets a cancelled appointment cancel its pending reminders.
 model OutboxEvent {
-  id          String       @id @default(uuid()) @db.Uuid
-  type        String
-  payload     Json
-  status      OutboxStatus @default(PENDING)
-  attempts    Int          @default(0)
-  lastError   String?
-  availableAt DateTime     @default(now())
-  processedAt DateTime?
-  createdAt   DateTime     @default(now())
+  id            String       @id @default(uuid()) @db.Uuid
+  type          String
+  aggregateType String?
+  aggregateId   String?
+  dedupeKey     String?      @unique
+  payload       Json
+  status        OutboxStatus @default(PENDING)
+  attempts      Int          @default(0)
+  lastError     String?
+  availableAt   DateTime     @default(now())
+  processedAt   DateTime?
+  cancelledAt   DateTime?
+  createdAt     DateTime     @default(now())
 
   @@index([status, availableAt])
+  @@index([aggregateType, aggregateId, status])
   @@map("outbox_events")
 }
 
@@ -527,50 +579,99 @@ model Address {
   @@map("addresses")
 }
 
-// ----------------------------- CLINICS & STAFF -----------------------
+// ------------------------- ESTABLISHMENTS (clinic and/or pharmacy) -----------
 
-model Clinic {
-  id              String       @id @default(uuid()) @db.Uuid
-  name            String
-  registrationNo  String?      @unique
-  phone           String
-  email           String?
-  line1           String
-  line2           String?
-  city            String
-  state           String
-  pincode         String
-  latitude        Decimal?     @db.Decimal(9, 6)
-  longitude       Decimal?     @db.Decimal(9, 6)
-  status          EntityStatus @default(PENDING)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  deletedAt       DateTime?
+// One business profile. It may run a CLINIC service, a PHARMACY service, or both.
+// Never create a second record for the same business: enable the other service instead.
+model Establishment {
+  id                String       @id @default(uuid()) @db.Uuid
+  name              String
+  legalName         String?
+  businessRegNo     String?      @unique
+  phone             String
+  email             String?
+  website           String?
+  logoUrl           String?
+  line1             String
+  line2             String?
+  landmark          String?
+  city              String
+  state             String
+  pincode           String
+  latitude          Decimal?     @db.Decimal(9, 6)
+  longitude         Decimal?     @db.Decimal(9, 6)
+  timezone          String       @default("Asia/Kolkata")
+  openingHours      Json?
+  settings          Json         @default("{}") // shared business settings
+  status            EntityStatus @default(PENDING)
+  isPrimaryPharmacy Boolean      @default(false) // at most one true (partial unique index in SQL); needs ACTIVE PHARMACY service
+  registeredById    String?      @db.Uuid
+  approvedById      String?      @db.Uuid
+  approvedAt        DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  deletedAt         DateTime?
 
-  staff           ClinicStaff[]
-  doctors         DoctorClinic[]
-  pharmacies      Pharmacy[]
-  prescriptions   Prescription[]
-  wallet          Wallet?
+  services              EstablishmentService[]
+  staff                 EstablishmentStaff[]
+  doctors               DoctorEstablishment[]
+  inventory             Inventory[]
+  orders                Order[]
+  sourcedPrescriptions  Prescription[]         @relation("PrescriptionSource")
+  pharmacyPrescriptions Prescription[]         @relation("PrescriptionPharmacy")
+  pickupQrs             PickupQr[]
+  wallet                Wallet?
+  commissionRules       CommissionRule[]
 
   @@index([city, status])
-  @@map("clinics")
+  @@index([status])
+  @@map("establishments")
 }
 
-model ClinicStaff {
-  id        String          @id @default(uuid()) @db.Uuid
-  userId    String          @db.Uuid
-  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  clinicId  String          @db.Uuid
-  clinic    Clinic          @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  staffRole ClinicStaffRole
-  isActive  Boolean         @default(true)
-  createdAt DateTime        @default(now())
+// Per-service switch, licence and settings. Service-specific data lives here, not on Establishment.
+// Clinic features require an ACTIVE CLINIC row; pharmacy features require an ACTIVE PHARMACY row.
+model EstablishmentService {
+  id                  String        @id @default(uuid()) @db.Uuid
+  establishmentId     String        @db.Uuid
+  establishment       Establishment @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
+  serviceType         ServiceType
+  status              ServiceStatus @default(PENDING)
+  isAcceptingRequests Boolean       @default(true) // temporary pause: bookings (clinic) or orders (pharmacy)
+  licenseNumber       String? // clinic registration no. or drug licence no.
+  licenseExpiry       DateTime?     @db.Date
+  settings            Json          @default("{}") // e.g. clinic: requireClinicReview; pharmacy: prepTimeMinutes
+  enabledAt           DateTime?
+  approvedById        String?       @db.Uuid
+  approvedAt          DateTime?
+  disabledAt          DateTime?
+  disabledReason      String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
 
-  @@unique([userId, clinicId])
-  @@index([clinicId, staffRole])
-  @@map("clinic_staff")
+  @@unique([establishmentId, serviceType])
+  @@unique([serviceType, licenseNumber])
+  @@index([serviceType, status])
+  @@map("establishment_services")
 }
+
+// Receptionist works for the CLINIC service, Pharmacist for the PHARMACY service, Admin for both.
+// User.role must match staffRole (ESTABLISHMENT_ADMIN / RECEPTIONIST / PHARMACIST) - enforced in the service layer.
+model EstablishmentStaff {
+  id              String                 @id @default(uuid()) @db.Uuid
+  userId          String                 @db.Uuid
+  user            User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  establishmentId String                 @db.Uuid
+  establishment   Establishment          @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
+  staffRole       EstablishmentStaffRole
+  licenseNo       String? // pharmacist registration number
+  isActive        Boolean                @default(true)
+  createdAt       DateTime               @default(now())
+
+  @@unique([userId, establishmentId])
+  @@index([establishmentId, staffRole, isActive])
+  @@map("establishment_staff")
+}
+
 
 // ----------------------------- DOCTORS ------------------------------
 
@@ -597,7 +698,7 @@ model DoctorProfile {
   createdAt          DateTime               @default(now())
   updatedAt          DateTime               @updatedAt
   specializations    DoctorSpecialization[]
-  clinics            DoctorClinic[]
+  establishments DoctorEstablishment[]
 
   @@map("doctor_profiles")
 }
@@ -612,34 +713,35 @@ model DoctorSpecialization {
   @@map("doctor_specializations")
 }
 
-// Clinic-specific doctor link: fees, schedules and appointments hang off this row.
-model DoctorClinic {
-  id                  String        @id @default(uuid()) @db.Uuid
-  doctorId            String        @db.Uuid
-  doctor              DoctorProfile @relation(fields: [doctorId], references: [id], onDelete: Cascade)
-  clinicId            String        @db.Uuid
-  clinic              Clinic        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+// Establishment-specific doctor link (requires an ACTIVE CLINIC service): fees, schedules, slots,
+// appointments and queues hang off this row. One global DoctorProfile can link to many establishments.
+model DoctorEstablishment {
+  id                   String        @id @default(uuid()) @db.Uuid
+  doctorId             String        @db.Uuid
+  doctor               DoctorProfile @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  establishmentId      String        @db.Uuid
+  establishment        Establishment @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
   consultationFeePaise Int
-  isActive            Boolean       @default(true)
-  createdAt           DateTime      @default(now())
+  isActive             Boolean       @default(true)
+  createdAt            DateTime      @default(now())
 
-  schedules           DoctorSchedule[]
-  exceptions          ScheduleException[]
-  slots               AppointmentSlot[]
-  appointments        Appointment[]
-  queueDays           QueueDay[]
+  schedules    DoctorSchedule[]
+  exceptions   ScheduleException[]
+  slots        AppointmentSlot[]
+  appointments Appointment[]
+  queueDays    QueueDay[]
 
-  @@unique([doctorId, clinicId])
-  @@index([clinicId, isActive])
-  @@map("doctor_clinics")
+  @@unique([doctorId, establishmentId])
+  @@index([establishmentId, isActive])
+  @@map("doctor_establishments")
 }
 
 // ------------------------- SCHEDULE, SLOTS, APPOINTMENTS ---------------
 
 model DoctorSchedule {
   id                  String       @id @default(uuid()) @db.Uuid
-  doctorClinicId      String       @db.Uuid
-  doctorClinic        DoctorClinic @relation(fields: [doctorClinicId], references: [id], onDelete: Cascade)
+  doctorEstablishmentId      String       @db.Uuid
+  doctorEstablishment        DoctorEstablishment @relation(fields: [doctorEstablishmentId], references: [id], onDelete: Cascade)
   dayOfWeek           Int // 0 = Sunday ... 6 = Saturday
   startMinute         Int // minutes from midnight, clinic local time
   endMinute           Int
@@ -649,21 +751,21 @@ model DoctorSchedule {
   validTo             DateTime?    @db.Date
   isActive            Boolean      @default(true)
 
-  @@index([doctorClinicId, dayOfWeek, isActive])
+  @@index([doctorEstablishmentId, dayOfWeek, isActive])
   @@map("doctor_schedules")
 }
 
 model ScheduleException {
   id             String                @id @default(uuid()) @db.Uuid
-  doctorClinicId String                @db.Uuid
-  doctorClinic   DoctorClinic          @relation(fields: [doctorClinicId], references: [id], onDelete: Cascade)
+  doctorEstablishmentId String                @db.Uuid
+  doctorEstablishment   DoctorEstablishment          @relation(fields: [doctorEstablishmentId], references: [id], onDelete: Cascade)
   exceptionDate  DateTime              @db.Date
   type           ScheduleExceptionType
   startMinute    Int?
   endMinute      Int?
   reason         String?
 
-  @@unique([doctorClinicId, exceptionDate])
+  @@unique([doctorEstablishmentId, exceptionDate])
   @@map("schedule_exceptions")
 }
 
@@ -671,8 +773,8 @@ model ScheduleException {
 // (CHECK bookedCount <= capacity is added in SQL migration).
 model AppointmentSlot {
   id             String        @id @default(uuid()) @db.Uuid
-  doctorClinicId String        @db.Uuid
-  doctorClinic   DoctorClinic  @relation(fields: [doctorClinicId], references: [id], onDelete: Cascade)
+  doctorEstablishmentId String        @db.Uuid
+  doctorEstablishment   DoctorEstablishment  @relation(fields: [doctorEstablishmentId], references: [id], onDelete: Cascade)
   slotDate       DateTime      @db.Date
   startMinute    Int
   endMinute      Int
@@ -681,8 +783,8 @@ model AppointmentSlot {
   status         SlotStatus    @default(OPEN)
   appointments   Appointment[]
 
-  @@unique([doctorClinicId, slotDate, startMinute])
-  @@index([doctorClinicId, slotDate, status])
+  @@unique([doctorEstablishmentId, slotDate, startMinute])
+  @@index([doctorEstablishmentId, slotDate, status])
   @@map("appointment_slots")
 }
 
@@ -691,8 +793,8 @@ model Appointment {
   appointmentNumber String            @unique
   patientId         String            @db.Uuid
   patient           User              @relation("PatientAppointments", fields: [patientId], references: [id])
-  doctorClinicId    String            @db.Uuid
-  doctorClinic      DoctorClinic      @relation(fields: [doctorClinicId], references: [id])
+  doctorEstablishmentId    String            @db.Uuid
+  doctorEstablishment      DoctorEstablishment      @relation(fields: [doctorEstablishmentId], references: [id])
   slotId            String            @db.Uuid
   slot              AppointmentSlot   @relation(fields: [slotId], references: [id])
   appointmentDate   DateTime          @db.Date
@@ -709,75 +811,32 @@ model Appointment {
   cancelledAt       DateTime?
   cancelReason      String?
 
-  @@unique([doctorClinicId, appointmentDate, tokenNumber])
+  @@unique([doctorEstablishmentId, appointmentDate, tokenNumber])
   @@unique([patientId, idempotencyKey])
   @@index([patientId, status])
   @@index([slotId])
-  @@index([doctorClinicId, appointmentDate, status])
+  @@index([doctorEstablishmentId, appointmentDate, status])
   @@map("appointments")
 }
 
 // One row per doctor-clinic-day. Locked to issue the next token atomically.
 model QueueDay {
   id                 String       @id @default(uuid()) @db.Uuid
-  doctorClinicId     String       @db.Uuid
-  doctorClinic       DoctorClinic @relation(fields: [doctorClinicId], references: [id], onDelete: Cascade)
+  doctorEstablishmentId     String       @db.Uuid
+  doctorEstablishment       DoctorEstablishment @relation(fields: [doctorEstablishmentId], references: [id], onDelete: Cascade)
   queueDate          DateTime     @db.Date
   lastTokenIssued    Int          @default(0)
   currentTokenNumber Int?
   status             QueueStatus  @default(OPEN)
   updatedAt          DateTime     @updatedAt
 
-  @@unique([doctorClinicId, queueDate])
+  @@unique([doctorEstablishmentId, queueDate])
   @@map("queue_days")
 }
 
-// ------------------------------ PHARMACY -----------------------------
+// ------------- PHARMACY SERVICE (data below is keyed by establishmentId) -------
 
-model Pharmacy {
-  id            String       @id @default(uuid()) @db.Uuid
-  name          String
-  clinicId      String?      @db.Uuid // null = standalone platform pharmacy
-  clinic        Clinic?      @relation(fields: [clinicId], references: [id], onDelete: SetNull)
-  licenseNumber String       @unique
-  phone         String
-  line1         String
-  line2         String?
-  city          String
-  state         String
-  pincode       String
-  latitude      Decimal?     @db.Decimal(9, 6)
-  longitude     Decimal?     @db.Decimal(9, 6)
-  isPrimary     Boolean      @default(false) // exactly one true (partial unique index in SQL)
-  status        EntityStatus @default(PENDING)
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
 
-  staff         PharmacyStaff[]
-  inventory     Inventory[]
-  orders        Order[]
-  prescriptions Prescription[]
-  pickupQrs     PickupQr[]
-
-  @@index([clinicId])
-  @@index([status])
-  @@map("pharmacies")
-}
-
-model PharmacyStaff {
-  id         String   @id @default(uuid()) @db.Uuid
-  userId     String   @db.Uuid
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  pharmacyId String   @db.Uuid
-  pharmacy   Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
-  licenseNo  String? // pharmacist registration number
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-
-  @@unique([userId, pharmacyId])
-  @@index([pharmacyId])
-  @@map("pharmacy_staff")
-}
 
 // ---------------------------- CATALOG & STOCK ------------------------
 
@@ -826,12 +885,12 @@ model Product {
   @@map("products")
 }
 
-// Pharmacy-specific stock. Available = quantity - reservedQuantity.
+// Pharmacy-service stock keyed by establishment (needs an ACTIVE PHARMACY service). Available = quantity - reservedQuantity.
 // SQL CHECKs: quantity >= 0, reservedQuantity >= 0, reservedQuantity <= quantity.
 model Inventory {
   id               String   @id @default(uuid()) @db.Uuid
-  pharmacyId       String   @db.Uuid
-  pharmacy         Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  establishmentId       String   @db.Uuid
+  establishment Establishment @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
   productId        String   @db.Uuid
   product          Product  @relation(fields: [productId], references: [id])
   quantity         Int      @default(0)
@@ -845,7 +904,7 @@ model Inventory {
 
   movements StockMovement[]
 
-  @@unique([pharmacyId, productId])
+  @@unique([establishmentId, productId])
   @@index([productId])
   @@map("inventory")
 }
@@ -873,10 +932,10 @@ model Prescription {
   prescriptionNumber String             @unique
   patientId          String             @db.Uuid
   patient            User               @relation("PatientPrescriptions", fields: [patientId], references: [id])
-  clinicId           String?            @db.Uuid // clinic chosen by patient (null = primary pharmacy path)
-  clinic             Clinic?            @relation(fields: [clinicId], references: [id])
-  pharmacyId         String?            @db.Uuid // pharmacy currently responsible
-  pharmacy           Pharmacy?          @relation(fields: [pharmacyId], references: [id])
+  sourceEstablishmentId String? @db.Uuid // establishment chosen by the patient (null = Primary Pharmacy path)
+  sourceEstablishment Establishment? @relation("PrescriptionSource", fields: [sourceEstablishmentId], references: [id])
+  pharmacyEstablishmentId String? @db.Uuid // establishment whose PHARMACY service verifies
+  pharmacyEstablishment Establishment? @relation("PrescriptionPharmacy", fields: [pharmacyEstablishmentId], references: [id])
   status             PrescriptionStatus @default(SUBMITTED)
   doctorName         String?
   patientNote        String?
@@ -894,8 +953,8 @@ model Prescription {
   orders  Order[]
 
   @@index([patientId, status])
-  @@index([pharmacyId, status])
-  @@index([clinicId, status])
+  @@index([pharmacyEstablishmentId, status])
+  @@index([sourceEstablishmentId, status])
   @@map("prescriptions")
 }
 
@@ -977,8 +1036,8 @@ model Order {
   orderNumber         String        @unique
   patientId           String        @db.Uuid
   patient             User          @relation("PatientOrders", fields: [patientId], references: [id])
-  pharmacyId          String        @db.Uuid
-  pharmacy            Pharmacy      @relation(fields: [pharmacyId], references: [id])
+  establishmentId          String        @db.Uuid
+  establishment Establishment @relation(fields: [establishmentId], references: [id])
   prescriptionId      String?       @db.Uuid
   prescription        Prescription? @relation(fields: [prescriptionId], references: [id])
   addressId           String?       @db.Uuid
@@ -1013,7 +1072,7 @@ model Order {
 
   @@unique([patientId, idempotencyKey])
   @@index([patientId, status, placedAt])
-  @@index([pharmacyId, status, placedAt])
+  @@index([establishmentId, status, placedAt])
   @@index([status, placedAt])
   @@map("orders")
 }
@@ -1135,8 +1194,8 @@ model PickupQr {
   id              String        @id @default(uuid()) @db.Uuid
   batchId         String        @db.Uuid
   batch           DeliveryBatch @relation(fields: [batchId], references: [id])
-  pharmacyId      String        @db.Uuid
-  pharmacy        Pharmacy      @relation(fields: [pharmacyId], references: [id])
+  establishmentId      String        @db.Uuid
+  establishment Establishment @relation(fields: [establishmentId], references: [id])
   tokenHash       String        @unique
   status          QrStatus      @default(ACTIVE)
   expiresAt       DateTime
@@ -1144,7 +1203,7 @@ model PickupQr {
   usedByRiderId   String?       @db.Uuid
   createdAt       DateTime      @default(now())
 
-  @@unique([batchId, pharmacyId])
+  @@unique([batchId, establishmentId])
   @@index([status, expiresAt])
   @@map("pickup_qrs")
 }
@@ -1217,7 +1276,7 @@ model CashDeposit {
 
 // -------------------------------- WALLET -----------------------------
 
-// ownerKey examples: "CUSTOMER:<userId>", "RIDER:<userId>", "CLINIC:<clinicId>",
+// ownerKey examples: "CUSTOMER:<userId>", "RIDER:<userId>", "ESTABLISHMENT:<establishmentId>",
 // "PLATFORM:REVENUE", "PLATFORM:COD_CLEARING", "PLATFORM:PAYOUT_CLEARING".
 // Balances are a cache of the ledger and are changed only in the same DB transaction
 // that appends LedgerEntry rows. SQL CHECK: balancePaise >= 0 unless allowNegative.
@@ -1227,8 +1286,8 @@ model Wallet {
   ownerType     WalletOwnerType
   userId        String?         @db.Uuid
   user          User?           @relation(fields: [userId], references: [id])
-  clinicId      String?         @unique @db.Uuid
-  clinic        Clinic?         @relation(fields: [clinicId], references: [id])
+  establishmentId String? @unique @db.Uuid
+  establishment Establishment? @relation(fields: [establishmentId], references: [id])
   balancePaise  BigInt          @default(0) // available
   heldPaise     BigInt          @default(0)
   allowNegative Boolean         @default(false) // true only for internal platform accounts
@@ -1252,6 +1311,7 @@ model LedgerTransaction {
   referenceId    String
   idempotencyKey String       @unique
   description    String?
+  serviceType ServiceType? // CLINIC or PHARMACY, for per-service reporting of establishment money
   createdBy      String?      @db.Uuid
   createdAt      DateTime     @default(now())
   entries        LedgerEntry[]
@@ -1320,7 +1380,8 @@ model Settlement {
 model CommissionRule {
   id          String           @id @default(uuid()) @db.Uuid
   target      CommissionTarget
-  clinicId    String?          @db.Uuid
+  establishmentId String? @db.Uuid
+  establishment Establishment? @relation(fields: [establishmentId], references: [id])
   rateBps     Int // basis points, 1000 = 10%
   isActive    Boolean          @default(true)
   validFrom   DateTime         @default(now())
@@ -1415,32 +1476,122 @@ model CouponRedemption {
 
 // ----------------------- NOTIFICATIONS & SUPPORT ---------------------
 
+// In-app notification store and history. One row per user per event. Never contains secrets (no OTP).
 model Notification {
-  id          String           @id @default(uuid()) @db.Uuid
-  userId      String           @db.Uuid
-  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type        NotificationType
+  id          String               @id @default(uuid()) @db.Uuid
+  userId      String               @db.Uuid
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category    NotificationCategory
+  eventType   String // e.g. "order.accepted" (catalog in docs/NOTIFICATIONS.md)
   title       String
   body        String
-  data        Json?
-  isSensitive Boolean          @default(false) // sensitive => push preview shows generic text
+  data        Json? // deep-link route and entity ids only
+  priority    NotificationPriority @default(NORMAL)
+  isSensitive Boolean              @default(false) // push shows generic text; full text only inside the app
+  isMandatory Boolean              @default(false) // ignores user preferences (security, delivery OTP alert)
+  entityType  String?
+  entityId    String?
+  dedupeKey   String // e.g. "order.accepted:<orderId>"; unique per user so retries never duplicate
   readAt      DateTime?
-  createdAt   DateTime         @default(now())
+  expiresAt   DateTime? // no push after this time (e.g. stale queue updates)
+  createdAt   DateTime             @default(now())
 
+  deliveries NotificationDelivery[]
+
+  @@unique([userId, dedupeKey])
   @@index([userId, readAt, createdAt])
+  @@index([userId, createdAt])
+  @@index([entityType, entityId])
   @@map("notifications")
 }
 
-model DeviceToken {
-  id         String         @id @default(uuid()) @db.Uuid
-  userId     String         @db.Uuid
-  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  token      String         @unique
-  platform   DevicePlatform
-  lastSeenAt DateTime       @default(now())
+// Delivery log: one row per push attempt target (per device token) and one for the socket emit.
+// SENT means accepted by FCM; real delivery is only known if the client acks (ackedAt).
+model NotificationDelivery {
+  id                String                     @id @default(uuid()) @db.Uuid
+  notificationId    String                     @db.Uuid
+  notification      Notification               @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  channel           NotificationChannel
+  deviceTokenId     String?                    @db.Uuid
+  deviceToken       DeviceToken?               @relation(fields: [deviceTokenId], references: [id], onDelete: SetNull)
+  provider          PushProvider?
+  status            NotificationDeliveryStatus @default(PENDING)
+  skipReason        String? // PREFERENCE_DISABLED, QUIET_HOURS, NO_ACTIVE_DEVICE, EXPIRED, NO_SOCKET
+  providerMessageId String?
+  attempts          Int                        @default(0)
+  lastErrorCode     String?
+  lastErrorMessage  String?
+  nextRetryAt       DateTime?
+  queuedAt          DateTime                   @default(now())
+  sentAt            DateTime?
+  ackedAt           DateTime?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
 
-  @@index([userId])
+  @@unique([notificationId, channel, deviceTokenId])
+  @@index([status, createdAt])
+  @@index([notificationId])
+  @@index([deviceTokenId])
+  @@map("notification_deliveries")
+}
+
+// One row per app install (deviceId). Multiple devices per user are supported. The FCM token can
+// rotate: the app calls PUT /devices/:deviceId with the new token. A token is globally unique; if a
+// different user registers the same token (shared phone) the row moves to the new user.
+model DeviceToken {
+  id            String         @id @default(uuid()) @db.Uuid
+  userId        String         @db.Uuid
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId     String?        @db.Uuid
+  session       Session?       @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  deviceId      String // stable per-install id generated by the app
+  token         String         @unique
+  platform      DevicePlatform
+  provider      PushProvider   @default(FCM) // iOS is delivered through FCM, which forwards to APNs
+  appVersion    String?
+  osVersion     String?
+  deviceModel   String?
+  locale        String?
+  isActive      Boolean        @default(true)
+  invalidatedAt DateTime?
+  invalidReason String? // UNREGISTERED, INVALID, LOGOUT, REASSIGNED, STALE
+  lastSeenAt    DateTime       @default(now())
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  deliveries NotificationDelivery[]
+
+  @@unique([userId, deviceId])
+  @@index([userId, isActive])
+  @@index([isActive, lastSeenAt])
   @@map("device_tokens")
+}
+
+model NotificationPreference {
+  id             String               @id @default(uuid()) @db.Uuid
+  userId         String               @db.Uuid
+  user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category       NotificationCategory
+  pushEnabled    Boolean              @default(true)
+  inAppEnabled   Boolean              @default(true)
+  updatedAt      DateTime             @updatedAt
+
+  @@unique([userId, category])
+  @@map("notification_preferences")
+}
+
+// Global switches. Quiet hours delay or suppress NORMAL priority push only; HIGH and mandatory bypass.
+model NotificationSetting {
+  id               String   @id @default(uuid()) @db.Uuid
+  userId           String   @unique @db.Uuid
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pushEnabled      Boolean  @default(true)
+  quietStartMinute Int?
+  quietEndMinute   Int?
+  timezone         String   @default("Asia/Kolkata")
+  updatedAt        DateTime @updatedAt
+
+  @@map("notification_settings")
 }
 
 model SupportTicket {

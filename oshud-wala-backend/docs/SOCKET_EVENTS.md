@@ -1,4 +1,4 @@
-# Socket.IO Event Registry (Phase 3 draft)
+# Socket.IO Event Registry (Phase 3 design v2)
 
 ## 1. Connection and authentication
 - Namespace: `/` (single namespace; rooms provide isolation).
@@ -10,10 +10,10 @@
 | Room | Joined by | Purpose |
 |---|---|---|
 | `user:{userId}` | Every user on connect | Personal notifications and updates |
-| `order:{orderId}` | Owning patient, assigned rider, pharmacy staff of that order, Super Admin | Order status |
-| `pharmacy:{pharmacyId}` | Pharmacists of that pharmacy | New orders and prescriptions |
-| `clinic:{clinicId}` | Clinic Admin, Receptionist, Doctors of that clinic | Appointments and prescriptions |
-| `queue:{doctorClinicId}:{yyyy-mm-dd}` | Patients with an appointment that day, clinic staff, that doctor | Live queue |
+| `order:{orderId}` | Owning patient, assigned rider, pharmacy staff of that order's establishment, Super Admin | Order status |
+| `est:{establishmentId}:pharmacy` | Pharmacists and admins of that establishment (PHARMACY service) | New orders and prescriptions |
+| `est:{establishmentId}:clinic` | Establishment Admin, Receptionists, linked Doctors (CLINIC service) | Appointments and clinic-side prescription review |
+| `queue:{doctorEstablishmentId}:{yyyy-mm-dd}` | Patients with an appointment that day, clinic staff, that doctor | Live queue |
 | `role:SUPER_ADMIN` | Super Admins | Operations feed |
 | `rider:{riderId}` | The rider | Assignments |
 
@@ -22,11 +22,12 @@ Every payload carries `eventId` (uuid), `occurredAt` (ISO), and where relevant `
 
 | Event | Rooms | Payload (summary) | Trigger |
 |---|---|---|---|
-| `notification:new` | `user:{id}` | notificationId, type, title, body (generic if sensitive) | Any persisted notification |
-| `order:created` | `pharmacy:{id}`, `role:SUPER_ADMIN` | orderId, orderNumber | Checkout |
+| `notification:new` | `user:{id}` | notificationId, category, title, body (generic if sensitive), route | Any persisted notification |
+| `notification:unread_count` | `user:{id}` | count | Notification created or read |
+| `order:created` | `est:{id}:pharmacy`, `role:SUPER_ADMIN` | orderId, orderNumber | Checkout |
 | `order:status_changed` | `order:{id}`, `user:{patientId}` | orderId, from, to | Any order transition |
 | `order:confirmation_required` | `user:{patientId}` | orderId, quotation summary | Pharmacist requests confirmation |
-| `prescription:status_changed` | `user:{patientId}`, `pharmacy:{id}`, `clinic:{id}` | prescriptionId, from, to | Prescription transition |
+| `prescription:status_changed` | `user:{patientId}`, `est:{id}:pharmacy`, `est:{id}:clinic` | prescriptionId, from, to | Prescription transition |
 | `delivery:assigned` | `rider:{riderId}`, `role:SUPER_ADMIN` | batchId, orderIds | Bulk assignment |
 | `delivery:unassigned` | `rider:{riderId}` | orderId | Reassignment |
 | `delivery:status_changed` | `order:{id}`, `role:SUPER_ADMIN` | deliveryId, from, to | Delivery transition |
@@ -35,7 +36,7 @@ Every payload carries `eventId` (uuid), `occurredAt` (ISO), and where relevant `
 | `delivery:completed` | `order:{id}`, `user:{customerId}`, `rider:{riderId}`, `role:SUPER_ADMIN` | orderId, deliveredAt | OTP verified |
 | `queue:updated` | `queue:{dc}:{date}` | currentToken, waitingCount, status | Call next / pause |
 | `queue:your_turn_soon` | `user:{patientId}` | appointmentId, tokensAhead | Queue progress |
-| `appointment:status_changed` | `user:{patientId}`, `clinic:{id}` | appointmentId, from, to | Appointment transition |
+| `appointment:status_changed` | `user:{patientId}`, `est:{id}:clinic` | appointmentId, from, to | Appointment transition |
 | `wallet:updated` | `user:{ownerId}` | walletId, newBalance | Ledger posting |
 | `withdrawal:status_changed` | `user:{requesterId}`, `role:SUPER_ADMIN` | withdrawalId, status | Withdrawal transition |
 | `cash:deposit_status_changed` | `rider:{riderId}`, `role:SUPER_ADMIN` | depositId, status | Deposit verification |
@@ -53,6 +54,7 @@ Every payload carries `eventId` (uuid), `occurredAt` (ISO), and where relevant `
 - After reconnect, the client calls `GET /api/v1/notifications?since=<lastEventTime>` and refetches the current resource (order, queue, delivery) to heal any gap.
 - The in-app OTP flow works with sockets down: the customer opens Order Tracking and reads the OTP from the authenticated REST endpoint; the rider submits via REST.
 - Push notification previews for sensitive types (`isSensitive = true`) show generic text only.
+- Sockets reach only **open** apps. Closed or background apps are reached by FCM push (APNs on iOS); see `NOTIFICATIONS.md`. Every socket event that matters also exists as a stored notification.
 
 ## 6. Security
 Per-event rate limits, payload size limits, room-join authorization, no broadcast of personal data to shared rooms, disconnect on session revocation.
