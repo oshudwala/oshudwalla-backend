@@ -1,0 +1,1477 @@
+// =====================================================================
+// OSHUD WALA - PRISMA SCHEMA (Phase 3 DESIGN DRAFT - awaiting approval)
+// Conventions:
+//  - Money is integer PAISE (Int for order/item amounts, BigInt for wallet/ledger).
+//  - UUID primary keys. Tables are snake_case via @@map.
+//  - Actor columns in history/audit tables (actorId, reviewedById, ...) are plain
+//    UUIDs on purpose: those rows must outlive user changes and need no back-relation.
+//  - Rules Prisma cannot express (CHECK constraints, partial unique indexes,
+//    immutability triggers) are listed in docs/ARCHITECTURE.md section 8 and will be
+//    added as raw SQL in migrations.
+// =====================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // Supabase pooler (runtime)
+  directUrl = env("DIRECT_URL") // direct connection (migrations)
+}
+
+// ------------------------------- ENUMS -------------------------------
+
+enum RoleName {
+  SUPER_ADMIN
+  PATIENT
+  CLINIC_ADMIN
+  DOCTOR
+  PHARMACIST
+  RIDER
+  RECEPTIONIST
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum EntityStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum ClinicStaffRole {
+  CLINIC_ADMIN
+  RECEPTIONIST
+}
+
+enum AppointmentStatus {
+  BOOKED
+  CHECKED_IN
+  IN_CONSULTATION
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum SlotStatus {
+  OPEN
+  BLOCKED
+}
+
+enum QueueStatus {
+  OPEN
+  PAUSED
+  CLOSED
+}
+
+enum ScheduleExceptionType {
+  LEAVE
+  MODIFIED_HOURS
+}
+
+enum PrescriptionStatus {
+  SUBMITTED
+  CLINIC_REVIEW
+  FORWARDED_TO_PHARMACY
+  PHARMACY_VERIFYING
+  AWAITING_CUSTOMER_CONFIRMATION
+  VERIFIED
+  REJECTED
+  CANCELLED
+  EXPIRED
+}
+
+enum PrescriptionItemStatus {
+  PENDING
+  AVAILABLE
+  SUBSTITUTED
+  UNAVAILABLE
+}
+
+enum StockMovementType {
+  RESERVE
+  RELEASE
+  DEDUCT
+  RESTOCK
+  ADJUSTMENT
+}
+
+enum OrderStatus {
+  PENDING_PHARMACY_REVIEW
+  AWAITING_CUSTOMER_CONFIRMATION
+  ACCEPTED
+  PREPARING
+  READY_FOR_PICKUP
+  RIDER_ASSIGNED
+  PICKED_UP
+  SHIPPED
+  DELIVERED
+  DELIVERY_FAILED
+  RETURNED
+  REJECTED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  COD
+}
+
+enum PaymentStatus {
+  PENDING
+  COLLECTED
+  SETTLED
+  REFUNDED
+}
+
+enum DeliveryStatus {
+  ASSIGNED
+  ACCEPTED
+  PICKED_UP
+  IN_TRANSIT
+  ARRIVED
+  DELIVERED
+  FAILED
+  CANCELLED
+}
+
+enum RiderStatus {
+  OFFLINE
+  AVAILABLE
+  BUSY
+  SUSPENDED
+}
+
+enum KycStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum QrStatus {
+  ACTIVE
+  USED
+  EXPIRED
+  REVOKED
+}
+
+enum OtpStatus {
+  ACTIVE
+  VERIFIED
+  EXPIRED
+  LOCKED
+  SUPERSEDED
+}
+
+enum WalletOwnerType {
+  CUSTOMER
+  CLINIC
+  RIDER
+  PLATFORM
+}
+
+enum LedgerTxType {
+  RIDER_EARNING
+  COD_COLLECTED
+  COD_DEPOSIT_VERIFIED
+  WITHDRAWAL_HOLD
+  WITHDRAWAL_RELEASE
+  WITHDRAWAL_PAYOUT
+  COMMISSION
+  CLINIC_SETTLEMENT_CREDIT
+  REFUND
+  ADJUSTMENT
+}
+
+enum LedgerEntryType {
+  CREDIT
+  DEBIT
+  HOLD
+  RELEASE
+  HOLD_CAPTURE
+}
+
+enum WithdrawalStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  PAID
+  CANCELLED
+}
+
+enum SettlementType {
+  WITHDRAWAL_PAYOUT
+  COD_CASH_DEPOSIT
+}
+
+enum CashCollectionStatus {
+  COLLECTED
+  DEPOSIT_PENDING
+  DEPOSITED
+  VERIFIED
+  DISCREPANCY
+}
+
+enum CashDepositStatus {
+  SUBMITTED
+  VERIFIED
+  REJECTED
+}
+
+enum CouponDiscountType {
+  PERCENT
+  FLAT
+}
+
+enum CoinTxType {
+  REFERRAL_REWARD
+  REDEEMED
+  REFUNDED
+  EXPIRED
+  ADJUSTMENT
+}
+
+enum ReferralStatus {
+  PENDING
+  QUALIFIED
+  REWARDED
+  VOID
+}
+
+enum NotificationType {
+  ORDER
+  DELIVERY
+  PRESCRIPTION
+  APPOINTMENT
+  QUEUE
+  WALLET
+  REFERRAL
+  SUPPORT
+  SYSTEM
+}
+
+enum DevicePlatform {
+  ANDROID
+  IOS
+  WEB
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum OutboxStatus {
+  PENDING
+  PROCESSED
+  FAILED
+}
+
+enum CommissionTarget {
+  PHARMACY_ORDER
+  APPOINTMENT
+}
+
+// ------------------------- AUTH, RBAC, SESSIONS -----------------------
+
+model Role {
+  id          String           @id @default(uuid()) @db.Uuid
+  name        RoleName         @unique
+  description String?
+  users       User[]
+  permissions RolePermission[]
+  createdAt   DateTime         @default(now())
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String           @id @default(uuid()) @db.Uuid
+  code        String           @unique // e.g. "order:read", "wallet:withdraw"
+  description String?
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String     @db.Uuid
+  permissionId String     @db.Uuid
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model User {
+  id               String     @id @default(uuid()) @db.Uuid
+  roleId           String     @db.Uuid
+  role             Role       @relation(fields: [roleId], references: [id])
+  email            String?    @unique
+  phone            String     @unique
+  passwordHash     String
+  fullName         String
+  status           UserStatus @default(ACTIVE)
+  phoneVerifiedAt  DateTime?
+  emailVerifiedAt  DateTime?
+  failedLoginCount Int        @default(0)
+  lockedUntil      DateTime?
+  lastLoginAt      DateTime?
+  referralCode     String?    @unique
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  deletedAt        DateTime?
+
+  sessions           Session[]
+  passwordResets     PasswordResetToken[]
+  patientProfile     PatientProfile?
+  doctorProfile      DoctorProfile?
+  riderProfile       RiderProfile?
+  addresses          Address[]
+  clinicStaff        ClinicStaff[]
+  pharmacyStaff      PharmacyStaff[]
+  cart               Cart?
+  orders             Order[]              @relation("PatientOrders")
+  prescriptions      Prescription[]       @relation("PatientPrescriptions")
+  appointments       Appointment[]        @relation("PatientAppointments")
+  notifications      Notification[]
+  deviceTokens       DeviceToken[]
+  wallets            Wallet[]
+  coinAccount        CoinAccount?
+  referralsMade      Referral[]           @relation("Referrer")
+  referralReceived   Referral?            @relation("Referred")
+  couponRedemptions  CouponRedemption[]
+  supportTickets     SupportTicket[]      @relation("TicketOwner")
+  assignedTickets    SupportTicket[]      @relation("TicketAssignee")
+  supportMessages    SupportMessage[]
+  ridersDeliveries   Delivery[]           @relation("RiderDeliveries")
+  cashCollections    CashCollection[]
+  cashDeposits       CashDeposit[]
+  auditLogs          AuditLog[]
+
+  @@index([roleId])
+  @@index([status])
+  @@map("users")
+}
+
+model Session {
+  id            String         @id @default(uuid()) @db.Uuid
+  userId        String         @db.Uuid
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceName    String?
+  userAgent     String?
+  ipAddress     String?
+  lastUsedAt    DateTime       @default(now())
+  revokedAt     DateTime?
+  revokedReason String?
+  createdAt     DateTime       @default(now())
+  refreshTokens RefreshToken[]
+
+  @@index([userId, revokedAt])
+  @@map("sessions")
+}
+
+// One row per issued refresh token. Rotation: a used token is marked usedAt and
+// replaced; presenting a used token again = reuse detected => whole session revoked.
+model RefreshToken {
+  id           String    @id @default(uuid()) @db.Uuid
+  sessionId    String    @db.Uuid
+  session      Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  tokenHash    String    @unique
+  expiresAt    DateTime
+  usedAt       DateTime?
+  revokedAt    DateTime?
+  replacedById String?   @db.Uuid
+  createdAt    DateTime  @default(now())
+
+  @@index([sessionId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model IdempotencyKey {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @db.Uuid
+  key          String
+  route        String
+  requestHash  String
+  responseCode Int?
+  responseBody Json?
+  lockedAt     DateTime @default(now())
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, route, key])
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  actorId    String?  @db.Uuid
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorRole  RoleName?
+  action     String // e.g. "order.accept", "wallet.withdrawal.approve"
+  entityType String
+  entityId   String?
+  before     Json?
+  after      Json?
+  ipAddress  String?
+  userAgent  String?
+  requestId  String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}
+
+model OutboxEvent {
+  id          String       @id @default(uuid()) @db.Uuid
+  type        String
+  payload     Json
+  status      OutboxStatus @default(PENDING)
+  attempts    Int          @default(0)
+  lastError   String?
+  availableAt DateTime     @default(now())
+  processedAt DateTime?
+  createdAt   DateTime     @default(now())
+
+  @@index([status, availableAt])
+  @@map("outbox_events")
+}
+
+model PlatformSetting {
+  key       String   @id
+  value     Json
+  updatedBy String?  @db.Uuid
+  updatedAt DateTime @updatedAt
+
+  @@map("platform_settings")
+}
+
+// --------------------------- PATIENT & ADDRESS ------------------------
+
+model PatientProfile {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @unique @db.Uuid
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dateOfBirth  DateTime? @db.Date
+  gender       Gender?
+  bloodGroup   String?
+  allergies    String?
+  medicalNotes String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("patient_profiles")
+}
+
+model Address {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label      String?
+  fullName   String
+  phone      String
+  line1      String
+  line2      String?
+  landmark   String?
+  city       String
+  state      String
+  pincode    String
+  latitude   Decimal? @db.Decimal(9, 6)
+  longitude  Decimal? @db.Decimal(9, 6)
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  deletedAt  DateTime?
+  orders     Order[]
+
+  @@index([userId])
+  @@map("addresses")
+}
+
+// ----------------------------- CLINICS & STAFF -----------------------
+
+model Clinic {
+  id              String       @id @default(uuid()) @db.Uuid
+  name            String
+  registrationNo  String?      @unique
+  phone           String
+  email           String?
+  line1           String
+  line2           String?
+  city            String
+  state           String
+  pincode         String
+  latitude        Decimal?     @db.Decimal(9, 6)
+  longitude       Decimal?     @db.Decimal(9, 6)
+  status          EntityStatus @default(PENDING)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  deletedAt       DateTime?
+
+  staff           ClinicStaff[]
+  doctors         DoctorClinic[]
+  pharmacies      Pharmacy[]
+  prescriptions   Prescription[]
+  wallet          Wallet?
+
+  @@index([city, status])
+  @@map("clinics")
+}
+
+model ClinicStaff {
+  id        String          @id @default(uuid()) @db.Uuid
+  userId    String          @db.Uuid
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clinicId  String          @db.Uuid
+  clinic    Clinic          @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  staffRole ClinicStaffRole
+  isActive  Boolean         @default(true)
+  createdAt DateTime        @default(now())
+
+  @@unique([userId, clinicId])
+  @@index([clinicId, staffRole])
+  @@map("clinic_staff")
+}
+
+// ----------------------------- DOCTORS ------------------------------
+
+model Specialization {
+  id          String                 @id @default(uuid()) @db.Uuid
+  name        String                 @unique
+  description String?
+  isActive    Boolean                @default(true)
+  doctors     DoctorSpecialization[]
+
+  @@map("specializations")
+}
+
+model DoctorProfile {
+  id                 String                 @id @default(uuid()) @db.Uuid
+  userId             String                 @unique @db.Uuid
+  user               User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  registrationNumber String                 @unique // medical council number
+  qualifications     String?
+  experienceYears    Int?
+  bio                String?
+  languages          String[]
+  isVerified         Boolean                @default(false)
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  specializations    DoctorSpecialization[]
+  clinics            DoctorClinic[]
+
+  @@map("doctor_profiles")
+}
+
+model DoctorSpecialization {
+  doctorId         String         @db.Uuid
+  specializationId String         @db.Uuid
+  doctor           DoctorProfile  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  specialization   Specialization @relation(fields: [specializationId], references: [id], onDelete: Cascade)
+
+  @@id([doctorId, specializationId])
+  @@map("doctor_specializations")
+}
+
+// Clinic-specific doctor link: fees, schedules and appointments hang off this row.
+model DoctorClinic {
+  id                  String        @id @default(uuid()) @db.Uuid
+  doctorId            String        @db.Uuid
+  doctor              DoctorProfile @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  clinicId            String        @db.Uuid
+  clinic              Clinic        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  consultationFeePaise Int
+  isActive            Boolean       @default(true)
+  createdAt           DateTime      @default(now())
+
+  schedules           DoctorSchedule[]
+  exceptions          ScheduleException[]
+  slots               AppointmentSlot[]
+  appointments        Appointment[]
+  queueDays           QueueDay[]
+
+  @@unique([doctorId, clinicId])
+  @@index([clinicId, isActive])
+  @@map("doctor_clinics")
+}
+
+// ------------------------- SCHEDULE, SLOTS, APPOINTMENTS ---------------
+
+model DoctorSchedule {
+  id                  String       @id @default(uuid()) @db.Uuid
+  doctorClinicId      String       @db.Uuid
+  doctorClinic        DoctorClinic @relation(fields: [doctorClinicId], references: [id], onDelete: Cascade)
+  dayOfWeek           Int // 0 = Sunday ... 6 = Saturday
+  startMinute         Int // minutes from midnight, clinic local time
+  endMinute           Int
+  slotDurationMinutes Int
+  slotCapacity        Int          @default(1)
+  validFrom           DateTime     @db.Date
+  validTo             DateTime?    @db.Date
+  isActive            Boolean      @default(true)
+
+  @@index([doctorClinicId, dayOfWeek, isActive])
+  @@map("doctor_schedules")
+}
+
+model ScheduleException {
+  id             String                @id @default(uuid()) @db.Uuid
+  doctorClinicId String                @db.Uuid
+  doctorClinic   DoctorClinic          @relation(fields: [doctorClinicId], references: [id], onDelete: Cascade)
+  exceptionDate  DateTime              @db.Date
+  type           ScheduleExceptionType
+  startMinute    Int?
+  endMinute      Int?
+  reason         String?
+
+  @@unique([doctorClinicId, exceptionDate])
+  @@map("schedule_exceptions")
+}
+
+// Concrete bookable slot. bookedCount is changed only inside a locking transaction
+// (CHECK bookedCount <= capacity is added in SQL migration).
+model AppointmentSlot {
+  id             String        @id @default(uuid()) @db.Uuid
+  doctorClinicId String        @db.Uuid
+  doctorClinic   DoctorClinic  @relation(fields: [doctorClinicId], references: [id], onDelete: Cascade)
+  slotDate       DateTime      @db.Date
+  startMinute    Int
+  endMinute      Int
+  capacity       Int
+  bookedCount    Int           @default(0)
+  status         SlotStatus    @default(OPEN)
+  appointments   Appointment[]
+
+  @@unique([doctorClinicId, slotDate, startMinute])
+  @@index([doctorClinicId, slotDate, status])
+  @@map("appointment_slots")
+}
+
+model Appointment {
+  id                String            @id @default(uuid()) @db.Uuid
+  appointmentNumber String            @unique
+  patientId         String            @db.Uuid
+  patient           User              @relation("PatientAppointments", fields: [patientId], references: [id])
+  doctorClinicId    String            @db.Uuid
+  doctorClinic      DoctorClinic      @relation(fields: [doctorClinicId], references: [id])
+  slotId            String            @db.Uuid
+  slot              AppointmentSlot   @relation(fields: [slotId], references: [id])
+  appointmentDate   DateTime          @db.Date
+  tokenNumber       Int
+  status            AppointmentStatus @default(BOOKED)
+  feePaise          Int
+  reason            String?
+  doctorNotes       String?
+  idempotencyKey    String?
+  bookedAt          DateTime          @default(now())
+  checkedInAt       DateTime?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  cancelledAt       DateTime?
+  cancelReason      String?
+
+  @@unique([doctorClinicId, appointmentDate, tokenNumber])
+  @@unique([patientId, idempotencyKey])
+  @@index([patientId, status])
+  @@index([slotId])
+  @@index([doctorClinicId, appointmentDate, status])
+  @@map("appointments")
+}
+
+// One row per doctor-clinic-day. Locked to issue the next token atomically.
+model QueueDay {
+  id                 String       @id @default(uuid()) @db.Uuid
+  doctorClinicId     String       @db.Uuid
+  doctorClinic       DoctorClinic @relation(fields: [doctorClinicId], references: [id], onDelete: Cascade)
+  queueDate          DateTime     @db.Date
+  lastTokenIssued    Int          @default(0)
+  currentTokenNumber Int?
+  status             QueueStatus  @default(OPEN)
+  updatedAt          DateTime     @updatedAt
+
+  @@unique([doctorClinicId, queueDate])
+  @@map("queue_days")
+}
+
+// ------------------------------ PHARMACY -----------------------------
+
+model Pharmacy {
+  id            String       @id @default(uuid()) @db.Uuid
+  name          String
+  clinicId      String?      @db.Uuid // null = standalone platform pharmacy
+  clinic        Clinic?      @relation(fields: [clinicId], references: [id], onDelete: SetNull)
+  licenseNumber String       @unique
+  phone         String
+  line1         String
+  line2         String?
+  city          String
+  state         String
+  pincode       String
+  latitude      Decimal?     @db.Decimal(9, 6)
+  longitude     Decimal?     @db.Decimal(9, 6)
+  isPrimary     Boolean      @default(false) // exactly one true (partial unique index in SQL)
+  status        EntityStatus @default(PENDING)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  staff         PharmacyStaff[]
+  inventory     Inventory[]
+  orders        Order[]
+  prescriptions Prescription[]
+  pickupQrs     PickupQr[]
+
+  @@index([clinicId])
+  @@index([status])
+  @@map("pharmacies")
+}
+
+model PharmacyStaff {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pharmacyId String   @db.Uuid
+  pharmacy   Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  licenseNo  String? // pharmacist registration number
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, pharmacyId])
+  @@index([pharmacyId])
+  @@map("pharmacy_staff")
+}
+
+// ---------------------------- CATALOG & STOCK ------------------------
+
+model Category {
+  id        String     @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String     @unique
+  parentId  String?    @db.Uuid
+  parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryTree")
+  imageUrl  String?
+  sortOrder Int        @default(0)
+  isActive  Boolean    @default(true)
+  products  Product[]
+
+  @@index([parentId])
+  @@map("categories")
+}
+
+model Product {
+  id                   String   @id @default(uuid()) @db.Uuid
+  name                 String
+  slug                 String   @unique
+  genericName          String?
+  manufacturer         String?
+  categoryId           String   @db.Uuid
+  category             Category @relation(fields: [categoryId], references: [id])
+  description          String?
+  packSize             String?
+  mrpPaise             Int
+  requiresPrescription Boolean  @default(false)
+  imageUrls            String[]
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  inventory         Inventory[]
+  cartItems         CartItem[]
+  orderItems        OrderItem[]
+  prescriptionItems PrescriptionItem[] @relation("PrescriptionItemProduct")
+  substituteItems   PrescriptionItem[] @relation("PrescriptionItemSubstitute")
+
+  @@index([categoryId, isActive])
+  @@index([name])
+  @@index([genericName])
+  @@map("products")
+}
+
+// Pharmacy-specific stock. Available = quantity - reservedQuantity.
+// SQL CHECKs: quantity >= 0, reservedQuantity >= 0, reservedQuantity <= quantity.
+model Inventory {
+  id               String   @id @default(uuid()) @db.Uuid
+  pharmacyId       String   @db.Uuid
+  pharmacy         Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  productId        String   @db.Uuid
+  product          Product  @relation(fields: [productId], references: [id])
+  quantity         Int      @default(0)
+  reservedQuantity Int      @default(0)
+  sellingPricePaise Int
+  reorderLevel     Int      @default(0)
+  batchNumber      String?
+  expiryDate       DateTime? @db.Date
+  isActive         Boolean  @default(true)
+  updatedAt        DateTime @updatedAt
+
+  movements StockMovement[]
+
+  @@unique([pharmacyId, productId])
+  @@index([productId])
+  @@map("inventory")
+}
+
+model StockMovement {
+  id          String            @id @default(uuid()) @db.Uuid
+  inventoryId String            @db.Uuid
+  inventory   Inventory         @relation(fields: [inventoryId], references: [id])
+  type        StockMovementType
+  quantity    Int // always positive; direction implied by type
+  orderId     String?           @db.Uuid
+  actorId     String?           @db.Uuid
+  note        String?
+  createdAt   DateTime          @default(now())
+
+  @@index([inventoryId, createdAt])
+  @@index([orderId])
+  @@map("stock_movements")
+}
+
+// ------------------------------ PRESCRIPTIONS ------------------------
+
+model Prescription {
+  id                 String             @id @default(uuid()) @db.Uuid
+  prescriptionNumber String             @unique
+  patientId          String             @db.Uuid
+  patient            User               @relation("PatientPrescriptions", fields: [patientId], references: [id])
+  clinicId           String?            @db.Uuid // clinic chosen by patient (null = primary pharmacy path)
+  clinic             Clinic?            @relation(fields: [clinicId], references: [id])
+  pharmacyId         String?            @db.Uuid // pharmacy currently responsible
+  pharmacy           Pharmacy?          @relation(fields: [pharmacyId], references: [id])
+  status             PrescriptionStatus @default(SUBMITTED)
+  doctorName         String?
+  patientNote        String?
+  rejectionReason    String?
+  clinicReviewedById String?            @db.Uuid
+  verifiedById       String?            @db.Uuid
+  verifiedAt         DateTime?
+  expiresAt          DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  files   PrescriptionFile[]
+  items   PrescriptionItem[]
+  history PrescriptionStatusHistory[]
+  orders  Order[]
+
+  @@index([patientId, status])
+  @@index([pharmacyId, status])
+  @@index([clinicId, status])
+  @@map("prescriptions")
+}
+
+model PrescriptionFile {
+  id             String       @id @default(uuid()) @db.Uuid
+  prescriptionId String       @db.Uuid
+  prescription   Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  storageKey     String // private bucket object key, never a public URL
+  mimeType       String
+  sizeBytes      Int
+  checksumSha256 String
+  uploadedAt     DateTime     @default(now())
+
+  @@index([prescriptionId])
+  @@map("prescription_files")
+}
+
+model PrescriptionItem {
+  id               String                 @id @default(uuid()) @db.Uuid
+  prescriptionId   String                 @db.Uuid
+  prescription     Prescription           @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  nameAsWritten    String
+  productId        String?                @db.Uuid
+  product          Product?               @relation("PrescriptionItemProduct", fields: [productId], references: [id])
+  substituteId     String?                @db.Uuid
+  substitute       Product?               @relation("PrescriptionItemSubstitute", fields: [substituteId], references: [id])
+  quantity         Int
+  dosage           String?
+  status           PrescriptionItemStatus @default(PENDING)
+  pharmacistNote   String?
+
+  @@index([prescriptionId])
+  @@map("prescription_items")
+}
+
+model PrescriptionStatusHistory {
+  id             String             @id @default(uuid()) @db.Uuid
+  prescriptionId String             @db.Uuid
+  prescription   Prescription       @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  fromStatus     PrescriptionStatus?
+  toStatus       PrescriptionStatus
+  actorId        String?            @db.Uuid
+  reason         String?
+  createdAt      DateTime           @default(now())
+
+  @@index([prescriptionId, createdAt])
+  @@map("prescription_status_history")
+}
+
+// ------------------------------- CART --------------------------------
+
+model Cart {
+  id        String     @id @default(uuid()) @db.Uuid
+  userId    String     @unique @db.Uuid
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  updatedAt DateTime   @updatedAt
+  items     CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id        String   @id @default(uuid()) @db.Uuid
+  cartId    String   @db.Uuid
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String   @db.Uuid
+  product   Product  @relation(fields: [productId], references: [id])
+  quantity  Int
+  addedAt   DateTime @default(now())
+
+  @@unique([cartId, productId])
+  @@map("cart_items")
+}
+
+// ------------------------------- ORDERS ------------------------------
+
+model Order {
+  id                  String        @id @default(uuid()) @db.Uuid
+  orderNumber         String        @unique
+  patientId           String        @db.Uuid
+  patient             User          @relation("PatientOrders", fields: [patientId], references: [id])
+  pharmacyId          String        @db.Uuid
+  pharmacy            Pharmacy      @relation(fields: [pharmacyId], references: [id])
+  prescriptionId      String?       @db.Uuid
+  prescription        Prescription? @relation(fields: [prescriptionId], references: [id])
+  addressId           String?       @db.Uuid
+  address             Address?      @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  deliveryAddress     Json // immutable snapshot taken at checkout
+  status              OrderStatus   @default(PENDING_PHARMACY_REVIEW)
+  paymentMethod       PaymentMethod @default(COD)
+  paymentStatus       PaymentStatus @default(PENDING)
+  subtotalPaise       Int
+  couponDiscountPaise Int           @default(0)
+  coinDiscountPaise   Int           @default(0)
+  deliveryFeePaise    Int           @default(0)
+  totalPaise          Int
+  couponId            String?       @db.Uuid
+  coinsUsed           Int           @default(0)
+  idempotencyKey      String?
+  cancelReason        String?
+  placedAt            DateTime      @default(now())
+  acceptedAt          DateTime?
+  readyAt             DateTime?
+  deliveredAt         DateTime?
+  cancelledAt         DateTime?
+  updatedAt           DateTime      @updatedAt
+
+  items            OrderItem[]
+  history          OrderStatusHistory[]
+  delivery         Delivery?
+  couponRedemption CouponRedemption?
+  cashCollection   CashCollection?
+  deliveryOtps     DeliveryOtp[]
+  coupon           Coupon?              @relation(fields: [couponId], references: [id])
+
+  @@unique([patientId, idempotencyKey])
+  @@index([patientId, status, placedAt])
+  @@index([pharmacyId, status, placedAt])
+  @@index([status, placedAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id                   String  @id @default(uuid()) @db.Uuid
+  orderId              String  @db.Uuid
+  order                Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId            String  @db.Uuid
+  product              Product @relation(fields: [productId], references: [id])
+  nameSnapshot         String
+  quantity             Int
+  mrpPaise             Int
+  unitPricePaise       Int
+  lineTotalPaise       Int
+  requiresPrescription Boolean @default(false)
+  prescriptionVerified Boolean @default(false)
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+model OrderStatusHistory {
+  id        String       @id @default(uuid()) @db.Uuid
+  orderId   String       @db.Uuid
+  order     Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fromStatus OrderStatus?
+  toStatus  OrderStatus
+  actorId   String?      @db.Uuid
+  actorRole RoleName?
+  reason    String?
+  createdAt DateTime     @default(now())
+
+  @@index([orderId, createdAt])
+  @@map("order_status_history")
+}
+
+// ------------------------- RIDERS & DELIVERY -------------------------
+
+model RiderProfile {
+  id             String      @id @default(uuid()) @db.Uuid
+  userId         String      @unique @db.Uuid
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicleType    String?
+  vehicleNumber  String?
+  licenseNumber  String?
+  kycStatus      KycStatus   @default(PENDING)
+  status         RiderStatus @default(OFFLINE)
+  currentLat     Decimal?    @db.Decimal(9, 6)
+  currentLng     Decimal?    @db.Decimal(9, 6)
+  lastLocationAt DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([status])
+  @@map("rider_profiles")
+}
+
+// A bulk assignment: one rider, several orders.
+model DeliveryBatch {
+  id           String     @id @default(uuid()) @db.Uuid
+  riderId      String     @db.Uuid
+  assignedById String     @db.Uuid
+  createdAt    DateTime   @default(now())
+  deliveries   Delivery[]
+  pickupQrs    PickupQr[]
+
+  @@index([riderId, createdAt])
+  @@map("delivery_batches")
+}
+
+// One active delivery per order (orderId unique). Reassignment updates this row
+// and writes a DeliveryStatusHistory record.
+model Delivery {
+  id             String         @id @default(uuid()) @db.Uuid
+  orderId        String         @unique @db.Uuid
+  order          Order          @relation(fields: [orderId], references: [id])
+  batchId        String         @db.Uuid
+  batch          DeliveryBatch  @relation(fields: [batchId], references: [id])
+  riderId        String         @db.Uuid
+  rider          User           @relation("RiderDeliveries", fields: [riderId], references: [id])
+  assignedById   String         @db.Uuid
+  status         DeliveryStatus @default(ASSIGNED)
+  assignedAt     DateTime       @default(now())
+  acceptedAt     DateTime?
+  pickedUpAt     DateTime?
+  shippedAt      DateTime?
+  arrivedAt      DateTime?
+  deliveredAt    DateTime?
+  failedReason   String?
+  riderEarningPaise Int?        // set once, on delivery completion
+
+  otps    DeliveryOtp[]
+  history DeliveryStatusHistory[]
+
+  @@index([riderId, status])
+  @@index([batchId])
+  @@map("deliveries")
+}
+
+model DeliveryStatusHistory {
+  id         String          @id @default(uuid()) @db.Uuid
+  deliveryId String          @db.Uuid
+  delivery   Delivery        @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  fromStatus DeliveryStatus?
+  toStatus   DeliveryStatus
+  riderId    String?         @db.Uuid
+  actorId    String?         @db.Uuid
+  note       String?
+  createdAt  DateTime        @default(now())
+
+  @@index([deliveryId, createdAt])
+  @@map("delivery_status_history")
+}
+
+// Pickup QR shown by a pharmacy for one batch. Only a hash of the token is stored.
+model PickupQr {
+  id              String        @id @default(uuid()) @db.Uuid
+  batchId         String        @db.Uuid
+  batch           DeliveryBatch @relation(fields: [batchId], references: [id])
+  pharmacyId      String        @db.Uuid
+  pharmacy        Pharmacy      @relation(fields: [pharmacyId], references: [id])
+  tokenHash       String        @unique
+  status          QrStatus      @default(ACTIVE)
+  expiresAt       DateTime
+  usedAt          DateTime?
+  usedByRiderId   String?       @db.Uuid
+  createdAt       DateTime      @default(now())
+
+  @@unique([batchId, pharmacyId])
+  @@index([status, expiresAt])
+  @@map("pickup_qrs")
+}
+
+// In-app delivery OTP.
+//  - otpHash       : HMAC used for verification (rider submits OTP; backend compares).
+//  - otpCiphertext : AES-256-GCM encrypted copy so the OWNING CUSTOMER can re-read it in
+//                    the app after refresh/reconnect. Decrypted only by the customer-owned
+//                    endpoint. Never returned to riders or admins.
+model DeliveryOtp {
+  id            String    @id @default(uuid()) @db.Uuid
+  orderId       String    @db.Uuid
+  order         Order     @relation(fields: [orderId], references: [id])
+  deliveryId    String    @db.Uuid
+  delivery      Delivery  @relation(fields: [deliveryId], references: [id])
+  customerId    String    @db.Uuid
+  riderId       String    @db.Uuid
+  otpHash       String
+  otpCiphertext String
+  status        OtpStatus @default(ACTIVE)
+  attempts      Int       @default(0)
+  maxAttempts   Int       @default(5)
+  expiresAt     DateTime
+  verifiedAt    DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([deliveryId, status])
+  @@index([orderId])
+  @@map("delivery_otps")
+}
+
+// ------------------------- COD CASH COLLECTION -----------------------
+
+model CashCollection {
+  id            String               @id @default(uuid()) @db.Uuid
+  orderId       String               @unique @db.Uuid
+  order         Order                @relation(fields: [orderId], references: [id])
+  riderId       String               @db.Uuid
+  rider         User                 @relation(fields: [riderId], references: [id])
+  amountPaise   Int
+  status        CashCollectionStatus @default(COLLECTED)
+  collectedAt   DateTime             @default(now())
+  depositId     String?              @db.Uuid
+  deposit       CashDeposit?         @relation(fields: [depositId], references: [id])
+  verifiedAt    DateTime?
+
+  @@index([riderId, status])
+  @@index([depositId])
+  @@map("cash_collections")
+}
+
+model CashDeposit {
+  id          String            @id @default(uuid()) @db.Uuid
+  riderId     String            @db.Uuid
+  rider       User              @relation(fields: [riderId], references: [id])
+  amountPaise Int
+  method      String // e.g. "BANK_TRANSFER", "UPI", "OFFICE_CASH"
+  referenceNo String?
+  status      CashDepositStatus @default(SUBMITTED)
+  verifiedById String?          @db.Uuid
+  verifiedAt  DateTime?
+  rejectionReason String?
+  submittedAt DateTime          @default(now())
+  collections CashCollection[]
+  settlement  Settlement?
+
+  @@index([riderId, status])
+  @@map("cash_deposits")
+}
+
+// -------------------------------- WALLET -----------------------------
+
+// ownerKey examples: "CUSTOMER:<userId>", "RIDER:<userId>", "CLINIC:<clinicId>",
+// "PLATFORM:REVENUE", "PLATFORM:COD_CLEARING", "PLATFORM:PAYOUT_CLEARING".
+// Balances are a cache of the ledger and are changed only in the same DB transaction
+// that appends LedgerEntry rows. SQL CHECK: balancePaise >= 0 unless allowNegative.
+model Wallet {
+  id            String          @id @default(uuid()) @db.Uuid
+  ownerKey      String          @unique
+  ownerType     WalletOwnerType
+  userId        String?         @db.Uuid
+  user          User?           @relation(fields: [userId], references: [id])
+  clinicId      String?         @unique @db.Uuid
+  clinic        Clinic?         @relation(fields: [clinicId], references: [id])
+  balancePaise  BigInt          @default(0) // available
+  heldPaise     BigInt          @default(0)
+  allowNegative Boolean         @default(false) // true only for internal platform accounts
+  version       Int             @default(0)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  entries     LedgerEntry[]
+  withdrawals WithdrawalRequest[]
+
+  @@index([ownerType, userId])
+  @@map("wallets")
+}
+
+// Groups the balanced entries of one financial event. idempotencyKey makes a
+// replayed event a no-op; (txType, referenceType, referenceId) is a second guard.
+model LedgerTransaction {
+  id             String       @id @default(uuid()) @db.Uuid
+  txType         LedgerTxType
+  referenceType  String
+  referenceId    String
+  idempotencyKey String       @unique
+  description    String?
+  createdBy      String?      @db.Uuid
+  createdAt      DateTime     @default(now())
+  entries        LedgerEntry[]
+
+  @@unique([txType, referenceType, referenceId])
+  @@map("ledger_transactions")
+}
+
+// IMMUTABLE: no updatedAt; UPDATE/DELETE blocked by a DB trigger (SQL migration).
+model LedgerEntry {
+  id                 String            @id @default(uuid()) @db.Uuid
+  transactionId      String            @db.Uuid
+  transaction        LedgerTransaction @relation(fields: [transactionId], references: [id])
+  walletId           String            @db.Uuid
+  wallet             Wallet            @relation(fields: [walletId], references: [id])
+  entryType          LedgerEntryType
+  amountPaise        BigInt // always > 0 (SQL CHECK)
+  balanceAfterPaise  BigInt
+  heldAfterPaise     BigInt
+  createdAt          DateTime          @default(now())
+
+  @@index([walletId, createdAt])
+  @@index([transactionId])
+  @@map("ledger_entries")
+}
+
+model WithdrawalRequest {
+  id              String           @id @default(uuid()) @db.Uuid
+  walletId        String           @db.Uuid
+  wallet          Wallet           @relation(fields: [walletId], references: [id])
+  requestedById   String           @db.Uuid
+  amountPaise     BigInt
+  status          WithdrawalStatus @default(REQUESTED)
+  payoutDetails   Json // bank / UPI details snapshot (encrypted fields in app layer)
+  idempotencyKey  String?
+  reviewedById    String?          @db.Uuid
+  reviewedAt      DateTime?
+  rejectionReason String?
+  requestedAt     DateTime         @default(now())
+  settlement      Settlement?
+
+  @@unique([requestedById, idempotencyKey])
+  @@index([walletId, status])
+  @@index([status, requestedAt])
+  @@map("withdrawal_requests")
+}
+
+model Settlement {
+  id                  String             @id @default(uuid()) @db.Uuid
+  type                SettlementType
+  amountPaise         BigInt
+  method              String
+  referenceNo         String?
+  withdrawalRequestId String?            @unique @db.Uuid
+  withdrawalRequest   WithdrawalRequest? @relation(fields: [withdrawalRequestId], references: [id])
+  cashDepositId       String?            @unique @db.Uuid
+  cashDeposit         CashDeposit?       @relation(fields: [cashDepositId], references: [id])
+  settledById         String             @db.Uuid
+  settledAt           DateTime           @default(now())
+  ledgerTransactionId String?            @unique @db.Uuid
+
+  @@index([type, settledAt])
+  @@map("settlements")
+}
+
+model CommissionRule {
+  id          String           @id @default(uuid()) @db.Uuid
+  target      CommissionTarget
+  clinicId    String?          @db.Uuid
+  rateBps     Int // basis points, 1000 = 10%
+  isActive    Boolean          @default(true)
+  validFrom   DateTime         @default(now())
+  validTo     DateTime?
+
+  @@index([target, isActive])
+  @@map("commission_rules")
+}
+
+// --------------------------- REFERRAL, COINS, COUPONS ----------------
+
+model Referral {
+  id                String         @id @default(uuid()) @db.Uuid
+  referrerId        String         @db.Uuid
+  referrer          User           @relation("Referrer", fields: [referrerId], references: [id])
+  referredUserId    String         @unique @db.Uuid // a user can be referred only once
+  referredUser      User           @relation("Referred", fields: [referredUserId], references: [id])
+  status            ReferralStatus @default(PENDING)
+  qualifyingOrderId String?        @unique @db.Uuid
+  rewardCoins       Int?
+  rewardedAt        DateTime?
+  createdAt         DateTime       @default(now())
+
+  @@index([referrerId, status])
+  @@map("referrals")
+}
+
+model CoinAccount {
+  id        String            @id @default(uuid()) @db.Uuid
+  userId    String            @unique @db.Uuid
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balance   Int               @default(0) // SQL CHECK >= 0
+  updatedAt DateTime          @updatedAt
+  entries   CoinTransaction[]
+
+  @@map("coin_accounts")
+}
+
+model CoinTransaction {
+  id           String      @id @default(uuid()) @db.Uuid
+  accountId    String      @db.Uuid
+  account      CoinAccount @relation(fields: [accountId], references: [id])
+  type         CoinTxType
+  amount       Int // signed
+  balanceAfter Int
+  referenceType String
+  referenceId  String
+  createdAt    DateTime    @default(now())
+
+  @@unique([accountId, type, referenceType, referenceId]) // no duplicate rewards
+  @@index([accountId, createdAt])
+  @@map("coin_transactions")
+}
+
+model Coupon {
+  id                String             @id @default(uuid()) @db.Uuid
+  code              String             @unique
+  description       String?
+  discountType      CouponDiscountType
+  discountValue     Int // percent (1-100) or paise
+  maxDiscountPaise  Int?
+  minOrderPaise     Int                @default(0)
+  validFrom         DateTime
+  validTo           DateTime
+  usageLimitTotal   Int?
+  usageLimitPerUser Int?
+  usedCount         Int                @default(0)
+  isActive          Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+
+  redemptions CouponRedemption[]
+  orders      Order[]
+
+  @@index([isActive, validTo])
+  @@map("coupons")
+}
+
+model CouponRedemption {
+  id          String   @id @default(uuid()) @db.Uuid
+  couponId    String   @db.Uuid
+  coupon      Coupon   @relation(fields: [couponId], references: [id])
+  userId      String   @db.Uuid
+  user        User     @relation(fields: [userId], references: [id])
+  orderId     String   @unique @db.Uuid
+  order       Order    @relation(fields: [orderId], references: [id])
+  discountPaise Int
+  redeemedAt  DateTime @default(now())
+
+  @@index([couponId, userId])
+  @@map("coupon_redemptions")
+}
+
+// ----------------------- NOTIFICATIONS & SUPPORT ---------------------
+
+model Notification {
+  id          String           @id @default(uuid()) @db.Uuid
+  userId      String           @db.Uuid
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        NotificationType
+  title       String
+  body        String
+  data        Json?
+  isSensitive Boolean          @default(false) // sensitive => push preview shows generic text
+  readAt      DateTime?
+  createdAt   DateTime         @default(now())
+
+  @@index([userId, readAt, createdAt])
+  @@map("notifications")
+}
+
+model DeviceToken {
+  id         String         @id @default(uuid()) @db.Uuid
+  userId     String         @db.Uuid
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token      String         @unique
+  platform   DevicePlatform
+  lastSeenAt DateTime       @default(now())
+
+  @@index([userId])
+  @@map("device_tokens")
+}
+
+model SupportTicket {
+  id          String           @id @default(uuid()) @db.Uuid
+  ticketNumber String          @unique
+  userId      String           @db.Uuid
+  user        User             @relation("TicketOwner", fields: [userId], references: [id])
+  orderId     String?          @db.Uuid
+  subject     String
+  status      TicketStatus     @default(OPEN)
+  priority    TicketPriority   @default(NORMAL)
+  assigneeId  String?          @db.Uuid
+  assignee    User?            @relation("TicketAssignee", fields: [assigneeId], references: [id])
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  messages    SupportMessage[]
+
+  @@index([userId, status])
+  @@index([status, priority])
+  @@map("support_tickets")
+}
+
+model SupportMessage {
+  id        String        @id @default(uuid()) @db.Uuid
+  ticketId  String        @db.Uuid
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  senderId  String        @db.Uuid
+  sender    User          @relation(fields: [senderId], references: [id])
+  body      String
+  createdAt DateTime      @default(now())
+
+  @@index([ticketId, createdAt])
+  @@map("support_messages")
+}
