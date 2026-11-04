@@ -1,26 +1,10 @@
 # API REGISTRY
 
-Base path: `/api/v1`
+| Module | Method | URL | Auth Required | Roles | Status | Automated Test | User Approved |
+|---|---|---|---|---|---|---|---|
+| Auth | POST | `/api/v1/auth/register` | No | Public | Implemented | Passed | Yes |
+| Auth | POST | `/api/v1/auth/login` | No | Public | Implemented | Passed | Yes |
+| Auth | POST | `/api/v1/auth/refresh` | No | Public | Implemented | Passed | Yes |
+| Auth | POST | `/api/v1/auth/logout` | Yes | All | Implemented | Passed | Yes |
 
-Status legend: `PLANNED` | `IMPLEMENTED` | `AI-VERIFIED` | `USER-TESTED` | `APPROVED`
-
-## Entry Template
-
-| Field | Value |
-|---|---|
-| Module | |
-| Method | |
-| URL | |
-| Authentication | |
-| Required Role | |
-| Request Parameters | |
-| Request Body | |
-| Response | |
-| Error Responses | |
-| Implementation Status | |
-| Postman Test Status | |
-| User Approval | |
-
-## Registered APIs
-
-None yet. No endpoints are implemented.
+*Note: Detailed API payloads and descriptions are available via the Swagger UI at `http://localhost:6000/docs`.*
