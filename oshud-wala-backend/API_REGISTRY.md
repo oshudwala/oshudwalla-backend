@@ -1,5 +1,7 @@
 # API REGISTRY
 
+# API REGISTRY
+
 | Module | Method | URL | Auth | Roles | Request Body (JSON Example) | Status | Auto Test | Approved |
 |---|---|---|---|---|---|---|---|---|
 | Auth | POST | `/api/v1/auth/register` | No | Public | `{"fullName": "Test Patient", "phone": "9876543210", "password": "Password123"}` | Implemented | Passed | Yes |
