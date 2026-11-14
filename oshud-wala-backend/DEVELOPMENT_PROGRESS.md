@@ -1,7 +1,7 @@
 # OSHUD WALA DEVELOPMENT PROGRESS
 
 ## Project Status
-IN DEVELOPMENT. Phase 6 (Notification Core) is currently underway. Device Tokens and Preferences APIs implemented.
+IN DEVELOPMENT. Phase 6 (Notification Core) is COMPLETE. BullMQ and Redis are fully integrated for background processing.
 
 ## Completed Phases
 - [x] Phase 1: Project folder structure
@@ -9,12 +9,10 @@ IN DEVELOPMENT. Phase 6 (Notification Core) is currently underway. Device Tokens
 - [x] Phase 3: Architecture and database design (v1 & v2 approved)
 - [x] Phase 4: Project Setup (Express, Zod, ApiError, Swagger, Jest)
 - [x] Phase 5: Authentication and RBAC (Tested & Deployed)
+- [x] Phase 6: Notification Core (FCM device management, preferences, and BullMQ push workers)
 
 ## Current Phase
-Phase 6: Notification Core (FCM/APNs device management, preferences, and push workers).
-- [x] Device Token Registration & Removal API
-- [x] Notification Preferences API
-- [ ] BullMQ Push Worker Setup
+Phase 7: Users & Addresses (Profile management, KYC status, and multiple addresses).
 
 ## Completed Modules
 - [x] Project Structure
@@ -22,10 +20,10 @@ Phase 6: Notification Core (FCM/APNs device management, preferences, and push wo
 - [x] Phase 3 design
 - [x] Project Setup (Phase 4)
 - [x] Authentication and RBAC (Phase 5)
+- [x] Notification core (Phase 6)
 
 ## Pending Modules (revised order)
-- [ ] Notification core (Phase 6) - *In Progress*
-- [ ] Users and Addresses
+- [ ] Users and Addresses - *Next*
 - [ ] Super Admin
 - [ ] Establishment (unified)
 - [ ] Doctor and Specialization
@@ -52,7 +50,7 @@ Phase 6: Notification Core (FCM/APNs device management, preferences, and push wo
 - [ ] Audit
 
 ## Tests
-- Executed: 8 (Auth & Notification)
-- Passed: 8
+- Executed: 9 (Auth & Notification)
+- Passed: 9
 - Failed: 0
-- Coverage: Auth (Registration, Login, Logout), Notification (Token Add/Remove, Get/Update Preferences).
+- Coverage: Auth (Registration, Login, Logout), Notification (Token, Preferences, BullMQ Worker).

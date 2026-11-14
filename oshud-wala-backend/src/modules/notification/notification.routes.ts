@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { registerToken, removeToken, getPreferences, updatePreferences } from './notification.controller';
+import { registerToken, removeToken, getPreferences, updatePreferences, sendTestPush } from './notification.controller';
 import { registerTokenSchema, updatePreferencesSchema } from './notification.validation';
 import { validate } from '../../middlewares/validate.middleware';
 import { authenticate } from '../../middlewares/auth.middleware';
@@ -118,5 +118,6 @@ router.get('/preferences', getPreferences);
  */
 router.put('/preferences', validate(updatePreferencesSchema), updatePreferences);
 
+router.post('/test-push', sendTestPush);
 
 export default router;

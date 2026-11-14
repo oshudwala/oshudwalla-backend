@@ -1,5 +1,6 @@
 import http from 'http';
 import app from './app';
+import './modules/notification/notification.worker';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';

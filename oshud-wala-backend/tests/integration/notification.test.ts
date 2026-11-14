@@ -1,6 +1,7 @@
 import request from 'supertest';
 import app from '../../src/app';
 import { PrismaClient } from '@prisma/client';
+import { redisConnection } from '../../src/config/redis';
 
 const prisma = new PrismaClient();
 jest.setTimeout(30000); // 30 seconds timeout
@@ -31,11 +32,12 @@ describe('Notification API Automated Tests', () => {
         accessToken = res.body.data.accessToken;
     });
 
-    afterAll(async () => {
+   afterAll(async () => {
         // Test er por data clean kora
         await prisma.deviceToken.deleteMany({ where: { token: testFcmToken } });
         await prisma.user.deleteMany({ where: { phone: testUser.phone } });
         await prisma.$disconnect();
+        await redisConnection.quit(); // <--- Redis bondho korar jnno eta must
     });
 
     it('should register a device token successfully', async () => {
@@ -127,6 +129,20 @@ describe('Notification API Automated Tests', () => {
         
         const apptPref = res.body.data.categories.find((c: any) => c.category === 'APPOINTMENT');
         expect(apptPref.inAppEnabled).toBe(false);
+    });
+
+    it('should enqueue a test push notification job', async () => {
+        const res = await request(app)
+            .post('/api/v1/notifications/test-push')
+            .set('Authorization', `Bearer ${accessToken}`)
+            .send({
+                title: "Jest Queue Test",
+                body: "Testing BullMQ integration"
+            });
+        
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(true);
+        expect(res.body.message).toBe("Push notification job enqueued successfully");
     });
 
 });
