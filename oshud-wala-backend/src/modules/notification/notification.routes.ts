@@ -1,8 +1,9 @@
 import { Router } from 'express';
-import { registerToken, removeToken } from './notification.controller';
+import { registerToken, removeToken, getPreferences, updatePreferences } from './notification.controller';
+import { registerTokenSchema, updatePreferencesSchema } from './notification.validation';
 import { validate } from '../../middlewares/validate.middleware';
-import { registerTokenSchema } from './notification.validation';
 import { authenticate } from '../../middlewares/auth.middleware';
+
 
 const router = Router();
 
@@ -63,5 +64,59 @@ router.post('/device-token', validate(registerTokenSchema), registerToken);
  *         description: Device token removed successfully
  */
 router.post('/device-token/remove', removeToken);
+
+
+
+// GET and PUT preferences
+/**
+ * @swagger
+ * /notifications/preferences:
+ *   get:
+ *     tags: [Notification]
+ *     summary: Get user's notification preferences
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Preferences retrieved successfully
+ */
+router.get('/preferences', getPreferences);
+
+/**
+ * @swagger
+ * /notifications/preferences:
+ *   put:
+ *     tags: [Notification]
+ *     summary: Update user's notification preferences
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               globalSettings:
+ *                 type: object
+ *                 properties:
+ *                   pushEnabled: { type: boolean }
+ *                   quietStartMinute: { type: number, nullable: true }
+ *                   quietEndMinute: { type: number, nullable: true }
+ *                   timezone: { type: string }
+ *               categories:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     category: { type: string, example: "ORDER" }
+ *                     pushEnabled: { type: boolean }
+ *                     inAppEnabled: { type: boolean }
+ *     responses:
+ *       200:
+ *         description: Preferences updated successfully
+ */
+router.put('/preferences', validate(updatePreferencesSchema), updatePreferences);
+
 
 export default router;

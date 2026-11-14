@@ -26,3 +26,38 @@ export const removeDeviceToken = async (userId: string, fcmToken: string) => {
         where: { userId, token: fcmToken }
     });
 };
+
+
+
+export const getNotificationSettings = async (userId: string) => {
+    return await prisma.notificationSetting.findUnique({
+        where: { userId }
+    });
+};
+
+export const getNotificationPreferences = async (userId: string) => {
+    return await prisma.notificationPreference.findMany({
+        where: { userId }
+    });
+};
+
+export const upsertGlobalSettings = async (userId: string, data: any) => {
+    return await prisma.notificationSetting.upsert({
+        where: { userId },
+        update: data,
+        create: { userId, ...data }
+    });
+};
+
+export const upsertCategoryPreferences = async (userId: string, categories: any[]) => {
+    // Execute multiple upserts in a transaction
+    return await prisma.$transaction(
+        categories.map(cat => 
+            prisma.notificationPreference.upsert({
+                where: { userId_category: { userId, category: cat.category } },
+                update: { pushEnabled: cat.pushEnabled, inAppEnabled: cat.inAppEnabled },
+                create: { userId, category: cat.category, pushEnabled: cat.pushEnabled, inAppEnabled: cat.inAppEnabled }
+            })
+        )
+    );
+};

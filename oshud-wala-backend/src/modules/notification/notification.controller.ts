@@ -19,3 +19,18 @@ export const removeToken = asyncHandler(async (req: AuthRequest, res: Response) 
     await notificationService.unregisterDeviceToken(userId as string, fcmToken);
     res.status(200).json(new ApiResponse(200, null, "Device token removed successfully"));
 });
+
+
+export const getPreferences = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user?.userId;
+    const result = await notificationService.fetchPreferences(userId as string);
+    res.status(200).json(new ApiResponse(200, result, "Notification preferences retrieved"));
+});
+
+export const updatePreferences = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user?.userId;
+    const { globalSettings, categories } = req.body;
+
+    const result = await notificationService.modifyPreferences(userId as string, globalSettings, categories);
+    res.status(200).json(new ApiResponse(200, result, "Notification preferences updated"));
+});

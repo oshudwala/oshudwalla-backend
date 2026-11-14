@@ -78,4 +78,55 @@ describe('Notification API Automated Tests', () => {
         expect(res.body.success).toBe(true);
         expect(res.body.message).toBe("Device token removed successfully");
     });
+    it('should get default notification preferences', async () => {
+        const res = await request(app)
+            .get('/api/v1/notifications/preferences')
+            .set('Authorization', `Bearer ${accessToken}`);
+        
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(true);
+        expect(res.body.data.globalSettings).toBeDefined();
+        expect(res.body.data.globalSettings.pushEnabled).toBe(true);
+        expect(res.body.data.categories).toBeInstanceOf(Array);
+    });
+
+    it('should update notification preferences', async () => {
+        const updatePayload = {
+            globalSettings: {
+                pushEnabled: true,
+                quietStartMinute: 1320,
+                quietEndMinute: 420,
+                timezone: "Asia/Kolkata"
+            },
+            categories: [
+                {
+                    category: "ORDER",
+                    pushEnabled: true,
+                    inAppEnabled: true
+                },
+                {
+                    category: "APPOINTMENT",
+                    pushEnabled: true,
+                    inAppEnabled: false
+                }
+            ]
+        };
+
+        const res = await request(app)
+            .put('/api/v1/notifications/preferences')
+            .set('Authorization', `Bearer ${accessToken}`)
+            .send(updatePayload);
+        
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(true);
+        expect(res.body.data.globalSettings.quietStartMinute).toBe(1320);
+        expect(res.body.data.categories.length).toBe(2);
+        
+        const orderPref = res.body.data.categories.find((c: any) => c.category === 'ORDER');
+        expect(orderPref.pushEnabled).toBe(true);
+        
+        const apptPref = res.body.data.categories.find((c: any) => c.category === 'APPOINTMENT');
+        expect(apptPref.inAppEnabled).toBe(false);
+    });
+
 });

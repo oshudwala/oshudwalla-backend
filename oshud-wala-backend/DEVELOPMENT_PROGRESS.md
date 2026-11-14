@@ -1,7 +1,7 @@
 # OSHUD WALA DEVELOPMENT PROGRESS
 
 ## Project Status
-IN DEVELOPMENT. Phase 6 (Notification Core) is currently underway. Device Token API implemented.
+IN DEVELOPMENT. Phase 6 (Notification Core) is currently underway. Device Tokens and Preferences APIs implemented.
 
 ## Completed Phases
 - [x] Phase 1: Project folder structure
@@ -13,7 +13,7 @@ IN DEVELOPMENT. Phase 6 (Notification Core) is currently underway. Device Token 
 ## Current Phase
 Phase 6: Notification Core (FCM/APNs device management, preferences, and push workers).
 - [x] Device Token Registration & Removal API
-- [ ] Notification Preferences API
+- [x] Notification Preferences API
 - [ ] BullMQ Push Worker Setup
 
 ## Completed Modules
@@ -52,7 +52,7 @@ Phase 6: Notification Core (FCM/APNs device management, preferences, and push wo
 - [ ] Audit
 
 ## Tests
-- Executed: 6 (Auth & Notification)
-- Passed: 6
+- Executed: 8 (Auth & Notification)
+- Passed: 8
 - Failed: 0
-- Coverage: Auth Registration, Login, Logout, Notification Token Add/Remove.
+- Coverage: Auth (Registration, Login, Logout), Notification (Token Add/Remove, Get/Update Preferences).
