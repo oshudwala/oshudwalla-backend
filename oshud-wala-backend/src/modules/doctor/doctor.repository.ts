@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { ApiError } from '../../utils/apiError';
 const prisma = new PrismaClient();
 
 export const onboardDoctorToPharmacy = async (pharmacyId: string, doctorData: any) => {
@@ -10,7 +11,8 @@ export const onboardDoctorToPharmacy = async (pharmacyId: string, doctorData: an
         if (doctorData.email) searchConditions.push({ email: doctorData.email });
 
         let user = await tx.user.findFirst({
-            where: { OR: searchConditions }
+            where: { OR: searchConditions },
+            include: { role: true }
         });
 
         let doctor = null;
@@ -20,6 +22,10 @@ export const onboardDoctorToPharmacy = async (pharmacyId: string, doctorData: an
             doctor = await tx.doctor.findUnique({ where: { userId: user.id } });
             
             if (!doctor) {
+                // Safety: never change the role of a non-patient account (e.g. SUPER_ADMIN, PHARMACY, RIDER)
+                if (user.role.name !== 'PATIENT') {
+                    throw new ApiError(409, `This phone/email already belongs to a ${user.role.name} account and cannot be converted to a Doctor.`);
+                }
                 // User ache kintu Doctor noy, tai take Doctor role dewa hocche
                 let doctorRole = await tx.role.findUnique({ where: { name: 'DOCTOR' } });
                 if (!doctorRole) {

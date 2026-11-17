@@ -10,7 +10,8 @@ router.use(authenticate);
 
 router.get('/pharmacy/:pharmacyId', getDoctorsList);
 
-// SUPER_ADMIN and PHARMACY_ADMIN can onboard/assign doctors to a pharmacy
-router.post('/onboard', authorizeRoles('SUPER_ADMIN', 'PHARMACY_ADMIN'), validate(addDoctorSchema), onboardDoctor);
+// SUPER_ADMIN only for now. PHARMACY (own pharmacy only) is added in the Doctor module step,
+// once the Pharmacy owner link exists for resource-level authorization.
+router.post('/onboard', authorizeRoles('SUPER_ADMIN'), validate(addDoctorSchema), onboardDoctor);
 
 export default router;

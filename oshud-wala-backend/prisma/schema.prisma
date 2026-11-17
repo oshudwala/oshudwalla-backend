@@ -22,11 +22,10 @@ datasource db {
 enum RoleName {
   SUPER_ADMIN
   PATIENT
-  PHARMACY_ADMIN
+  PHARMACY
   DOCTOR
-  PHARMACIST
-  RIDER
   RECEPTIONIST
+  RIDER
 }
 
 enum UserStatus {
@@ -90,14 +89,6 @@ enum PrescriptionItemStatus {
   AVAILABLE
   SUBSTITUTED
   UNAVAILABLE
-}
-
-enum StockMovementType {
-  RESERVE
-  RELEASE
-  DEDUCT
-  RESTOCK
-  ADJUSTMENT
 }
 
 enum OrderStatus {
@@ -274,9 +265,8 @@ enum CommissionTarget {
 }
 
 enum PharmacyStaffRole {
-  ADMIN
+  OWNER
   RECEPTIONIST
-  PHARMACIST
 }
 
 enum NotificationCategory {
@@ -591,7 +581,6 @@ model Pharmacy {
 
   staff           PharmacyStaff[]
   doctors         PharmacyDoctor[]
-  inventory       Inventory[]
   orders          Order[]
   prescriptions   Prescription[]
   pickupQrs       PickupQr[]
@@ -610,7 +599,7 @@ model PharmacyStaff {
   pharmacyId String            @db.Uuid
   pharmacy   Pharmacy          @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
   staffRole  PharmacyStaffRole
-  licenseNo  String? // For pharmacists
+  licenseNo  String?
   isActive   Boolean           @default(true)
   createdAt  DateTime          @default(now())
 
@@ -782,7 +771,7 @@ model QueueDay {
   @@map("queue_days")
 }
 
-// ---------------------------- CATALOG & STOCK ------------------------
+// ---------------------------- CATALOG ------------------------
 
 model Category {
   id        String     @id @default(uuid()) @db.Uuid
@@ -817,7 +806,6 @@ model Product {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
-  inventory         Inventory[]
   cartItems         CartItem[]
   orderItems        OrderItem[]
   prescriptionItems PrescriptionItem[] @relation("PrescriptionItemProduct")
@@ -827,44 +815,6 @@ model Product {
   @@index([name])
   @@index([genericName])
   @@map("products")
-}
-
-model Inventory {
-  id                String    @id @default(uuid()) @db.Uuid
-  pharmacyId        String    @db.Uuid
-  pharmacy          Pharmacy  @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
-  productId         String    @db.Uuid
-  product           Product   @relation(fields: [productId], references: [id])
-  quantity          Int       @default(0)
-  reservedQuantity  Int       @default(0)
-  sellingPricePaise Int
-  reorderLevel      Int       @default(0)
-  batchNumber       String?
-  expiryDate        DateTime? @db.Date
-  isActive          Boolean   @default(true)
-  updatedAt         DateTime  @updatedAt
-
-  movements StockMovement[]
-
-  @@unique([pharmacyId, productId])
-  @@index([productId])
-  @@map("inventory")
-}
-
-model StockMovement {
-  id          String            @id @default(uuid()) @db.Uuid
-  inventoryId String            @db.Uuid
-  inventory   Inventory         @relation(fields: [inventoryId], references: [id])
-  type        StockMovementType
-  quantity    Int
-  orderId     String?           @db.Uuid
-  actorId     String?           @db.Uuid
-  note        String?
-  createdAt   DateTime          @default(now())
-
-  @@index([inventoryId, createdAt])
-  @@index([orderId])
-  @@map("stock_movements")
 }
 
 // ------------------------------ PRESCRIPTIONS ------------------------
@@ -924,7 +874,7 @@ model PrescriptionItem {
   quantity       Int
   dosage         String?
   status         PrescriptionItemStatus @default(PENDING)
-  pharmacistNote String?
+  reviewNote     String?  @map("pharmacistNote")
 
   @@index([prescriptionId])
   @@map("prescription_items")

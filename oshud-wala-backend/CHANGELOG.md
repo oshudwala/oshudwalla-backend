@@ -2,6 +2,21 @@
 
 Chronological record of features, code changes, bug fixes, database changes, breaking changes and API changes.
 
+## 2026-11-18 (Step 0 + Step 1)
+
+### Security
+- `.env` removed from git tracking and ignored; `.env.example` sanitized. Secrets must be rotated.
+- Doctor onboarding restricted to SUPER_ADMIN (PHARMACY_ADMIN could add doctors to any pharmacy).
+- Doctor onboarding no longer converts non-PATIENT accounts (e.g. SUPER_ADMIN) into DOCTOR.
+- Seed creates Super Admin from env (no hard-coded password); `make-admin.ts` removed.
+- Raw DB error messages no longer returned to clients in pharmacy/doctor services.
+
+### Changed
+- Roles reduced to six: PHARMACY replaces PHARMACY_ADMIN and PHARMACIST. `PharmacyStaffRole` is now OWNER, RECEPTIONIST.
+- Removed Inventory, StockMovement, StockMovementType (out of approved scope). `pharmacistNote` renamed `reviewNote` (same DB column).
+- Removed empty modules pharmacist, clinic, clinicStaff, inventory; removed duplicate `bcryptjs`.
+- `establishment.test.ts` replaced by `pharmacy.test.ts` (old test referenced a non-existent model).
+
 ## 2026-11-05
 
 ### Changed (design v2, awaiting approval)

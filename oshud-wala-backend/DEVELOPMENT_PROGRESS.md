@@ -1,52 +1,24 @@
 # OSHUD WALA DEVELOPMENT PROGRESS
 
-## Project Status
-IN DEVELOPMENT. Phase 9 (Establishment) is COMPLETE. Super Admin can now create centralized establishments with Clinic and/or Pharmacy services and seamlessly toggle the platform's Primary Pharmacy.
+Source of truth for business rules: the Master Project Development Prompt (six roles, unified PHARMACY, no inventory).
 
-## Completed Phases
-- [x] Phase 1: Project folder structure
-- [x] Phase 2: README.md and tracking documents
-- [x] Phase 3: Architecture and database design (v1 & v2 approved)
-- [x] Phase 4: Project Setup (Express, Zod, ApiError, Swagger, Jest)
-- [x] Phase 5: Authentication and RBAC (Tested & Deployed)
-- [x] Phase 6: Notification Core (FCM device management, preferences, and BullMQ push workers)
-- [x] Phase 7: Users & Addresses (Profile management, KYC status, and multiple addresses)
-- [x] Phase 8: Super Admin (Platform settings, User role management)
-- [x] Phase 9: Establishment (Super Admin creation, services, and Primary Pharmacy logic)
+## Status
+IN DEVELOPMENT. Re-baselined after repo audit (18 Nov 2026). Earlier "Establishment" design is superseded: the code uses a single `Pharmacy` entity.
 
-## Current Phase
-Phase 10: Doctor & Specialization
+## Implemented (code exists)
+- Auth: register, login, refresh (rotation), logout
+- Notification core: device tokens, preferences, BullMQ push worker
+- User profile + addresses
+- Super Admin: user role/status, platform settings
+- Specialization, Doctor onboarding (Super Admin only), Pharmacy create/list/set-primary (Super Admin)
 
-## Roadmap Add-ons (Scheduled)
-- **Phase 14 (Order):** Enable Pharmacy Owners to place orders on behalf of users (Walk-in/POS style).
-- **Phase 20 (Wallet):** Enable Super Admin to directly edit/adjust user wallet balances via manual ledger entries.
-
-## Pending Modules (revised order)
-- [ ] Doctor and Specialization - *Next*
-- [ ] Schedule
-- [ ] Appointment
-- [ ] Live Queue
-- [ ] Pharmacist and pharmacy service settings
-- [ ] Product and Category
-- [ ] Inventory
-- [ ] Prescription
-- [ ] Cart
-- [ ] Order
-- [ ] Rider
-- [ ] Delivery and QR Pickup
-- [ ] In-App Delivery OTP
-- [ ] Referral and Coins
-- [ ] Coupon
-- [ ] Wallet
-- [ ] Withdrawal and Settlement
-- [ ] Cash Collection
-- [ ] Support
-- [ ] Notification hardening
-- [ ] Reports and Analytics
-- [ ] Audit
+## Re-baseline steps (current)
+- [x] Step 0: secrets out of git (.env ignored), rotate secrets (OWNER ACTION)
+- [ ] Step 1: six-role migration, remove inventory/stock, cleanup, doc sync  <-- apply + Postman test
+- [ ] Step 2: Location master
+- [ ] Step 3: Pharmacy upgrade (owner login, multilingual names, images, services, opening hours, map)
+- [ ] Step 4: Doctor global profile + PharmacyDoctor assignment
+- [ ] Then: schedule, discovery, appointment, unavailability, receptionist/queue, catalogue/order, prescription, billing, rider, QR, OTP, payment/COD, earnings, wallet, rewards, announcements, notifications, reports, support/audit
 
 ## Tests
-- Executed: 23 (Auth, Notification, User, Admin, Establishment)
-- Passed: 23
-- Failed: 0
-- Coverage: Auth, Notification Tokens/Prefs/BullMQ, User Profile/Address, Super Admin User Access & Settings, Admin Establishment Creation & Primary Toggling (with 403 checks).
+Previous "23 passed" claim is NOT verified: `establishment.test.ts` referenced a model/route that no longer exists. Test run results are recorded in TEST_REPORT.md only after the owner runs them.

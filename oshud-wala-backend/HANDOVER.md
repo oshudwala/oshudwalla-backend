@@ -1,10 +1,6 @@
-# PROJECT HANDOVER & CONTEXT
+# HANDOVER
 
-**Current State:**
-Phase 5 (Authentication) complete and fully verified. Standardized error handling (`ApiError`), response formatting (`ApiResponse`), asynchronous wrappers (`asyncHandler`), and Zod validation middlewares are integrated into the core architecture. Automated tests (Jest/Supertest) are configured and passing for the Auth module. Swagger documentation is live at `/docs`.
-
-**Database:**
-Supabase PostgreSQL is connected. Roles and Super Admin seeded successfully. Authentication leverages JWT + Refresh Token Rotation with bcrypt hashing, mapping correctly to `User`, `Role`, `Session`, and `RefreshToken` tables.
-
-**Immediate Next Task:**
-Start Phase 6: Notification Core. This involves building the device token lifecycle (`device_tokens`), in-app notification storage, notification preferences, and the BullMQ fan-out/push worker architecture as defined in the v2 design.
+Stack: Node, Express, TypeScript, Prisma, Supabase PostgreSQL, Redis, BullMQ, Socket.IO.
+Roles (final, six): SUPER_ADMIN, PATIENT, PHARMACY, DOCTOR, RECEPTIONIST, RIDER.
+Rules: no inventory/stock, no Establishment entity, no PHARMACIST/PHARMACY_ADMIN/CLINIC_ADMIN.
+Current work: Step 1 re-baseline (see DEVELOPMENT_PROGRESS.md). Manual SQL lives in prisma/manual/.

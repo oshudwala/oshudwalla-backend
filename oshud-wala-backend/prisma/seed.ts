@@ -1,44 +1,53 @@
 import { PrismaClient, RoleName } from '@prisma/client';
 import bcrypt from 'bcrypt';
+import dotenv from 'dotenv';
 
+dotenv.config();
 const prisma = new PrismaClient();
 
 async function main() {
-    console.log('🌱 Starting database seed...');
-
-    const roles = Object.values(RoleName);
-    
-    for (const roleName of roles) {
+    console.log('Seeding roles...');
+    for (const roleName of Object.values(RoleName)) {
         await prisma.role.upsert({
             where: { name: roleName },
             update: {},
             create: { name: roleName, description: `${roleName} role` },
         });
     }
-    console.log('✅ Roles seeded');
+    console.log(`Roles ready: ${Object.values(RoleName).join(', ')}`);
 
-    const superAdminRole = await prisma.role.findUnique({ where: { name: RoleName.SUPER_ADMIN } });
-    
-    if (superAdminRole) {
-        const adminEmail = 'admin@oshudwala.com';
-        const existingAdmin = await prisma.user.findUnique({ where: { email: adminEmail } });
-        
-        if (!existingAdmin) {
-            const passwordHash = await bcrypt.hash('Admin@123', 10);
-            await prisma.user.create({
-                data: {
-                    email: adminEmail,
-                    phone: '0000000000',
-                    passwordHash,
-                    fullName: 'Super Admin',
-                    roleId: superAdminRole.id,
-                }
-            });
-            console.log('✅ Default Super Admin created (admin@oshudwala.com / Admin@123)');
-        }
+    const email = process.env.SUPER_ADMIN_EMAIL;
+    const phone = process.env.SUPER_ADMIN_PHONE;
+    const password = process.env.SUPER_ADMIN_PASSWORD;
+    const fullName = process.env.SUPER_ADMIN_FULL_NAME || 'Super Admin';
+
+    if (!email || !phone || !password) {
+        console.log('SUPER_ADMIN_EMAIL / SUPER_ADMIN_PHONE / SUPER_ADMIN_PASSWORD not set. Skipping Super Admin creation.');
+        return;
+    }
+    if (password.length < 12) {
+        throw new Error('SUPER_ADMIN_PASSWORD must be at least 12 characters.');
     }
 
-    console.log('🌱 Seeding complete!');
+    const existing = await prisma.user.findFirst({ where: { OR: [{ email }, { phone }] } });
+    if (existing) {
+        console.log('A user with this email/phone already exists. Super Admin not created (no changes made).');
+        return;
+    }
+
+    const role = await prisma.role.findUniqueOrThrow({ where: { name: RoleName.SUPER_ADMIN } });
+    await prisma.user.create({
+        data: {
+            email,
+            phone,
+            fullName,
+            passwordHash: await bcrypt.hash(password, 12),
+            roleId: role.id,
+            emailVerifiedAt: new Date(),
+            phoneVerifiedAt: new Date(),
+        },
+    });
+    console.log(`Super Admin created: ${email}`);
 }
 
 main()

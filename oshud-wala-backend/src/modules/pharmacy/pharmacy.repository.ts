@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { ApiError } from '../../utils/apiError';
 const prisma = new PrismaClient();
 
 export const createPharmacy = async (adminId: string, data: any) => {
@@ -25,6 +26,10 @@ export const createPharmacy = async (adminId: string, data: any) => {
 
 export const setPrimaryPharmacy = async (pharmacyId: string) => {
     return await prisma.$transaction(async (tx) => {
+        const target = await tx.pharmacy.findUnique({ where: { id: pharmacyId } });
+        if (!target) throw new ApiError(404, 'Pharmacy not found');
+        if (target.status !== 'ACTIVE') throw new ApiError(400, 'Only an ACTIVE pharmacy can be set as Primary');
+
         // 1. Unset the current primary pharmacy
         await tx.pharmacy.updateMany({
             where: { isPrimary: true },
