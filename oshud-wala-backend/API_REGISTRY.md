@@ -27,4 +27,4 @@
 | Doctor | GET | `/api/v1/doctors/pharmacy/:pharmacyId` | Yes | All (needs scoping later) | *None* | Implemented | Owner to retest | No |
 | Doctor | POST | `/api/v1/doctors/onboard` | Yes | SUPER_ADMIN | `{"pharmacyId": "uuid", "fullName": "Dr X", "phone": "9876543211", "specializationId": "uuid", "registrationNumber": "WB123"}` | Implemented | Owner to retest | No |
 
-*Note: Detailed API descriptions and live testing are available via the Swagger UI at `https://oshudwalla-backend-1.onrender.com/docs` (Live) or `http://localhost:8000/docs` (Local).*
+*Note: Detailed API descriptions and live testing are available via the Swagger UI at `https://oshudwalla-backend-1.onrender.com/docs` (Live) or `http://localhost:8000/docs` (Local).*. 
