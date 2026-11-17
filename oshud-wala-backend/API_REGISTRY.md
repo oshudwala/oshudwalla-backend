@@ -26,5 +26,11 @@
 | Pharmacy | PUT | `/api/v1/pharmacies/admin-primary/:id` | Yes | SUPER_ADMIN | *None* | Implemented | Owner to retest | No |
 | Doctor | GET | `/api/v1/doctors/pharmacy/:pharmacyId` | Yes | All (needs scoping later) | *None* | Implemented | Owner to retest | No |
 | Doctor | POST | `/api/v1/doctors/onboard` | Yes | SUPER_ADMIN | `{"pharmacyId": "uuid", "fullName": "Dr X", "phone": "9876543211", "specializationId": "uuid", "registrationNumber": "WB123"}` | Implemented | Owner to retest | No |
+| Location | GET | `/api/v1/locations` | No | Public | query: city, state, q, page, limit (active only) | Implemented | Owner to test | No |
+| Location | GET | `/api/v1/locations/:id` | No | Public | *None* (active only) | Implemented | Owner to test | No |
+| Location | GET | `/api/v1/locations/admin/all` | Yes | SUPER_ADMIN | query: isActive, city, state, q, page, limit | Implemented | Owner to test | No |
+| Location | POST | `/api/v1/locations` | Yes | SUPER_ADMIN | `{"city":"Durgapur","area":"City Centre","state":"West Bengal","pincode":"713216","latitude":23.5204,"longitude":87.3119}` | Implemented | Owner to test | No |
+| Location | PUT | `/api/v1/locations/:id` | Yes | SUPER_ADMIN | `{"area":"Bidhannagar"}` | Implemented | Owner to test | No |
+| Location | PATCH | `/api/v1/locations/:id/status` | Yes | SUPER_ADMIN | `{"isActive":false}` | Implemented | Owner to test | No |
 
-*Note: Detailed API descriptions and live testing are available via the Swagger UI at `https://oshudwalla-backend-1.onrender.com/docs` (Live) or `http://localhost:8000/docs` (Local).*.   
+*Note: Detailed API descriptions and live testing are available via the Swagger UI at `https://oshudwalla-backend-1.onrender.com/docs` (Live) or `http://localhost:8000/docs` (Local).*

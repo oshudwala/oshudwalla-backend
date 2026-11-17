@@ -6,6 +6,7 @@ import adminRoutes from './modules/admin/admin.routes';
 import specializationRoutes from './modules/specialization/specialization.routes';
 import doctorRoutes from './modules/doctor/doctor.routes';
 import pharmacyRoutes from './modules/pharmacy/pharmacy.routes';
+import locationRoutes from './modules/location/location.routes';
 
 const router = Router();
 
@@ -16,5 +17,6 @@ router.use('/admin', adminRoutes); // admin
 router.use('/specializations', specializationRoutes); // specilagiaction
 router.use('/doctors', doctorRoutes); // doctors
 router.use('/pharmacies', pharmacyRoutes);
+router.use('/locations', locationRoutes);
 
 export default router;

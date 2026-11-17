@@ -2,6 +2,10 @@
 
 Chronological record of features, code changes, bug fixes, database changes, breaking changes and API changes.
 
+## 2026-11-18 (Step 2: Location master)
+- Added `Location` model (`locations` table), `src/config/prisma.ts` shared Prisma client, `/api/v1/locations` module (public active list, Super Admin create/update/activate/deactivate, audit logged, duplicate protection).
+- Hard delete intentionally not provided (locations will be referenced by pharmacies/appointments).
+
 ## 2026-11-18 (Step 0 + Step 1)
 
 ### Security

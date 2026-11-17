@@ -15,7 +15,7 @@ IN DEVELOPMENT. Re-baselined after repo audit (18 Nov 2026). Earlier "Establishm
 ## Re-baseline steps (current)
 - [x] Step 0: secrets out of git (.env ignored), rotate secrets (OWNER ACTION)
 - [ ] Step 1: six-role migration, remove inventory/stock, cleanup, doc sync  <-- apply + Postman test
-- [ ] Step 2: Location master
+- [ ] Step 2: Location master  <-- apply + Postman test
 - [ ] Step 3: Pharmacy upgrade (owner login, multilingual names, images, services, opening hours, map)
 - [ ] Step 4: Doctor global profile + PharmacyDoctor assignment
 - [ ] Then: schedule, discovery, appointment, unavailability, receptionist/queue, catalogue/order, prescription, billing, rider, QR, OTP, payment/COD, earnings, wallet, rewards, announcements, notifications, reports, support/audit

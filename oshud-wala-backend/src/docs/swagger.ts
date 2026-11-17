@@ -33,5 +33,5 @@ const swaggerSpec = swaggerJsdoc(options);
 
 export const setupSwagger = (app: Application) => {
     app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-    console.log('📄 Swagger Docs available at http://localhost:6000/docs');
+    console.log('📄 Swagger Docs available at http://localhost:8000/docs');
 };
