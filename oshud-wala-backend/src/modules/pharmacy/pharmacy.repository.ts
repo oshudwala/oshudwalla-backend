@@ -1,6 +1,9 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../config/prisma';
 import { ApiError } from '../../utils/apiError';
-const prisma = new PrismaClient();
+
+const locationSelect = { select: { id: true, city: true, area: true, state: true, pincode: true } };
+
+export const findLocationById = (id: string) => prisma.location.findUnique({ where: { id } });
 
 export const createPharmacy = async (adminId: string, data: any) => {
     return await prisma.$transaction(async (tx) => {
@@ -12,14 +15,25 @@ export const createPharmacy = async (adminId: string, data: any) => {
             });
         }
 
+        // explicit whitelist: nothing else from the request body reaches the database
         return await tx.pharmacy.create({
             data: {
-                ...data,
+                name: data.name,
+                phone: data.phone,
+                email: data.email ?? null,
+                line1: data.line1,
+                line2: data.line2 ?? null,
+                city: data.city,
+                state: data.state,
+                pincode: data.pincode,
+                locationId: data.locationId ?? null,
+                isPrimary: data.isPrimary ?? false,
                 registeredById: adminId,
                 approvedById: adminId,
                 approvedAt: new Date(),
                 status: 'ACTIVE'
-            }
+            },
+            include: { location: locationSelect }
         });
     });
 };
@@ -47,6 +61,7 @@ export const setPrimaryPharmacy = async (pharmacyId: string) => {
 export const getAllPharmacies = async () => {
     return await prisma.pharmacy.findMany({
         where: { status: 'ACTIVE' },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
+        include: { location: locationSelect }
     });
 };

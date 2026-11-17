@@ -571,6 +571,7 @@ model Pharmacy {
   settings      Json         @default("{}")
   status        EntityStatus @default(ACTIVE)
   isPrimary     Boolean      @default(false) // Super Admin controls this
+  locationId    String?      @db.Uuid
 
   registeredById String?   @db.Uuid
   approvedById   String?   @db.Uuid
@@ -586,9 +587,11 @@ model Pharmacy {
   pickupQrs       PickupQr[]
   wallet          Wallet?
   commissionRules CommissionRule[]
+  location        Location?    @relation(fields: [locationId], references: [id])
 
   @@index([city, status])
   @@index([status])
+  @@index([locationId])
   @@map("pharmacies")
 }
 
@@ -625,6 +628,7 @@ model Location {
   uniqueKey String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  pharmacies Pharmacy[]
 
   @@index([state, city, isActive])
   @@index([isActive])
