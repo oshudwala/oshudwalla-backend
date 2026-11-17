@@ -47,3 +47,7 @@ export const listLocationSchema = z.object({
         limit: z.coerce.number().int().min(1).max(100).default(20),
     }),
 });
+
+export const getLocationSchema = z.object({
+    params: z.object({ id: z.string().uuid() }),
+});

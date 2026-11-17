@@ -7,6 +7,7 @@ import {
     updateLocationSchema,
     setLocationStatusSchema,
     listLocationSchema,
+    getLocationSchema,
 } from './location.validation';
 
 const router = Router();
@@ -21,6 +22,6 @@ router.put('/:id', authenticate, authorizeRoles('SUPER_ADMIN'), validate(updateL
 router.patch('/:id/status', authenticate, authorizeRoles('SUPER_ADMIN'), validate(setLocationStatusSchema), c.setStatus);
 
 // Public single location (active only)
-router.get('/:id', c.getPublic);
+router.get('/:id', validate(getLocationSchema), c.getPublic);
 
 export default router;
