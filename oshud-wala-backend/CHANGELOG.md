@@ -2,6 +2,10 @@
 
 Chronological record of features, code changes, bug fixes, database changes, breaking changes and API changes.
 
+## 2026-11-18 (Step 3A: Pharmacy location link)
+- Added nullable locationId on Pharmacy linked to Location. When locationId is given, city, state and pincode are copied from the Location master. Old way (city, state, pincode) still works.
+- Pharmacy repository now uses shared prisma client and an explicit field whitelist (no body spread).
+
 ## 2026-11-18 (Step 2: Location master)
 - Added `Location` model (`locations` table), `src/config/prisma.ts` shared Prisma client, `/api/v1/locations` module (public active list, Super Admin create/update/activate/deactivate, audit logged, duplicate protection).
 - Hard delete intentionally not provided (locations will be referenced by pharmacies/appointments).
