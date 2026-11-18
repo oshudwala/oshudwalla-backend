@@ -2,6 +2,16 @@
 
 Chronological record of features, code changes, bug fixes, database changes, breaking changes and API changes.
 
+## 2026-11-18 (Step 3A-3: Pharmacy + owner account)
+- POST /api/v1/pharmacies/admin-create now creates the pharmacy and its owner login in one transaction (ownerName, ownerEmail, ownerPassword, phone, locationId, line1, optional latitude+longitude). Duplicate phone or email gives 409. Password is hashed and never returned.
+- Removed POST /api/v1/pharmacies/:id/owner. Kept GET /api/v1/pharmacies/my.
+- Tests: pharmacy-create (19) and pharmacy (5) replace pharmacy-owner and pharmacy-location.
+
+## /2026-11-18 (Step 3A-3: Pharmacy + owner account)
+- POST /api/v1/pharmacies/admin-create now creates the pharmacy and its owner login in one transaction (ownerName, ownerEmail, ownerPassword, phone, locationId, line1, optional latitude+longitude). Duplicate phone or email gives 409. Password is hashed and never returned.
+- Removed POST /api/v1/pharmacies/:id/owner. Kept GET /api/v1/pharmacies/my.
+- Tests: pharmacy-create (19) and pharmacy (5) replace pharmacy-owner and pharmacy-location.
+
 ## 2026-11-18 (Step 3A-2: Pharmacy owner link)
 - Added POST /api/v1/pharmacies/:id/owner (Super Admin links a PHARMACY role user as OWNER via PharmacyStaff, audit logged, duplicate and second-owner protection) and GET /api/v1/pharmacies/my (PHARMACY user sees only own pharmacies).
 - Role is never changed by this endpoint. No schema change.

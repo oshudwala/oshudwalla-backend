@@ -22,7 +22,7 @@
 | Admin | GET | `/api/v1/admin/settings` | Yes | SUPER_ADMIN | *None* | Implemented | Passed | Yes |
 | Admin | POST | `/api/v1/admin/settings` | Yes | SUPER_ADMIN | `{"key": "REFERRAL_BONUS", "value": {"coins": 50}}` | Implemented | Passed | Yes |
 | Pharmacy | GET | `/api/v1/pharmacies` | Yes | All | *None* | Implemented | Owner to retest | No |
-| Pharmacy | POST | `/api/v1/pharmacies/admin-create` | Yes | SUPER_ADMIN | `{"name": "Oshud Wala", "phone": "9876543210", "line1": "City Center", "city": "Durgapur", "state": "WB", "pincode": "713216", "isPrimary": true}` | Implemented | Owner to retest | No |
+| Pharmacy | POST | `/api/v1/pharmacies/admin-create` | Yes | SUPER_ADMIN | `{"name":"Shop","ownerName":"Owner","ownerEmail":"owner-email","ownerPassword":"min8chars","phone":"9876500001","locationId":"uuid","line1":"Main Road","latitude":23.5,"longitude":87.3}` | Implemented | Auto-tested | No |
 | Pharmacy | PUT | `/api/v1/pharmacies/admin-primary/:id` | Yes | SUPER_ADMIN | *None* | Implemented | Owner to retest | No |
 | Doctor | GET | `/api/v1/doctors/pharmacy/:pharmacyId` | Yes | All (needs scoping later) | *None* | Implemented | Owner to retest | No |
 | Doctor | POST | `/api/v1/doctors/onboard` | Yes | SUPER_ADMIN | `{"pharmacyId": "uuid", "fullName": "Dr X", "phone": "9876543211", "specializationId": "uuid", "registrationNumber": "WB123"}` | Implemented | Owner to retest | No |
@@ -32,7 +32,6 @@
 | Location | POST | `/api/v1/locations` | Yes | SUPER_ADMIN | `{"city":"Durgapur","area":"City Centre","state":"West Bengal","pincode":"713216","latitude":23.5204,"longitude":87.3119}` | Implemented | Owner to test | No |
 | Location | PUT | `/api/v1/locations/:id` | Yes | SUPER_ADMIN | `{"area":"Bidhannagar"}` | Implemented | Owner to test | No |
 | Location | PATCH | `/api/v1/locations/:id/status` | Yes | SUPER_ADMIN | `{"isActive":false}` | Implemented | Owner to test | No |
-| Pharmacy | POST | `/api/v1/pharmacies/:id/owner` | Yes | SUPER_ADMIN | `{"userId":"uuid"}` | Implemented | Auto-tested | No |
 | Pharmacy | GET | `/api/v1/pharmacies/my` | Yes | PHARMACY | *None* | Implemented | Auto-tested | No |
 
 *Note: Detailed API descriptions and live testing are available via the Swagger UI at `https://oshudwalla-backend-1.onrender.com/docs` (Live) or `http://localhost:8000/docs` (Local).*

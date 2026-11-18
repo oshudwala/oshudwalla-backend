@@ -1,25 +1,23 @@
 import { z } from 'zod';
 
+const lat = z.number().min(-90).max(90);
+const lng = z.number().min(-180).max(180);
+
 export const createPharmacySchema = z.object({
     body: z.object({
-        name: z.string().min(2, "Pharmacy name is required"),
-        phone: z.string().min(10, "Valid phone is required"),
-        email: z.string().email("Invalid email").optional().nullable(),
-        line1: z.string().min(2, "Address line 1 is required"),
-        line2: z.string().optional().nullable(),
-        locationId: z.string().uuid("Invalid locationId").optional().nullable(),
-        city: z.string().min(2).optional(),
-        state: z.string().min(2).optional(),
-        pincode: z.string().min(4).optional(),
-        isPrimary: z.boolean().optional().default(false)
-    }).refine((d) => !!d.locationId || (!!d.city && !!d.state && !!d.pincode), {
-        message: 'Provide locationId, or city + state + pincode',
-        path: ['locationId'],
+        name: z.string().trim().min(2, "Pharmacy name is required"),
+        ownerName: z.string().trim().min(2, "Owner name is required"),
+        ownerEmail: z.string().trim().email("Invalid owner email"),
+        ownerPassword: z.string().min(8, "Password must be at least 8 characters").max(72),
+        phone: z.string().trim().regex(/^[0-9]{10,15}$/, "Valid phone number is required"),
+        locationId: z.string().uuid("Valid locationId is required"),
+        line1: z.string().trim().min(2, "Street address is required"),
+        line2: z.string().trim().optional().nullable(),
+        latitude: lat.optional().nullable(),
+        longitude: lng.optional().nullable(),
+        isPrimary: z.boolean().optional()
+    }).refine((d) => (d.latitude == null) === (d.longitude == null), {
+        message: 'latitude and longitude must be provided together',
+        path: ['latitude'],
     })
-});
-
-
-export const assignOwnerSchema = z.object({
-    params: z.object({ id: z.string().uuid() }),
-    body: z.object({ userId: z.string().uuid("Invalid userId") }),
 });
