@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { createNewPharmacy, makePharmacyPrimary, getPharmacies, getMyPharmacies } from './pharmacy.controller';
+import { createNewPharmacy, makePharmacyPrimary, getPharmacies, getMyPharmacies, updatePharmacyProfile } from './pharmacy.controller';
 import { validate } from '../../middlewares/validate.middleware';
-import { createPharmacySchema } from './pharmacy.validation';
+import { createPharmacySchema, updatePharmacySchema } from './pharmacy.validation';
 import { authenticate, authorizeRoles } from '../../middlewares/auth.middleware';
 
 const router = Router();
@@ -17,5 +17,8 @@ router.get('/my', authorizeRoles('PHARMACY'), getMyPharmacies);
 // SUPER_ADMIN ONLY ROUTES
 router.post('/admin-create', authorizeRoles('SUPER_ADMIN'), validate(createPharmacySchema), createNewPharmacy);
 router.put('/admin-primary/:id', authorizeRoles('SUPER_ADMIN'), makePharmacyPrimary);
+
+// SUPER_ADMIN (any pharmacy) or PHARMACY owner (own pharmacy only, checked in the service)
+router.put('/:id', authorizeRoles('SUPER_ADMIN', 'PHARMACY'), validate(updatePharmacySchema), updatePharmacyProfile);
 
 export default router;

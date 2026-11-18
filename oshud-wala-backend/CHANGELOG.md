@@ -2,6 +2,9 @@
 
 Chronological record of features, code changes, bug fixes, database changes, breaking changes and API changes.
 
+## 2026-11-18 (Step 3B-2: Pharmacy profile update)
+- Added PUT /api/v1/pharmacies/:id. Super Admin edits any pharmacy, a PHARMACY user edits only the pharmacy where they are an active OWNER (else 403). Editable: name, nameBn, nameHi, phone, line1, line2, latitude+longitude (together, null clears the pin). status, isPrimary, city and locationId are ignored. Audit logged as PHARMACY_UPDATED.
+
 ## 2026-11-18 (Step 3B: Bengali and Hindi pharmacy name)
 - Added nullable Pharmacy.nameBn and Pharmacy.nameHi (2 to 100 characters). POST /api/v1/pharmacies/admin-create accepts them and pharmacy lists and /my return them.
 

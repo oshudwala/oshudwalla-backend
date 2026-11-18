@@ -112,3 +112,30 @@ export const findPharmaciesByStaffUser = (userId: string) =>
         orderBy: { createdAt: 'desc' },
         include: { location: locationSelect },
     });
+
+// ---------------- Step 3B-2: profile update ----------------
+
+export const findPharmacyById = (id: string) => prisma.pharmacy.findUnique({ where: { id } });
+
+export const findActiveOwnerLink = (userId: string, pharmacyId: string) =>
+    prisma.pharmacyStaff.findFirst({ where: { userId, pharmacyId, staffRole: 'OWNER', isActive: true } });
+
+export const updatePharmacyWithAudit = (id: string, before: any, data: any, actor: Actor) =>
+    prisma.$transaction(
+        async (tx) => {
+            const updated = await tx.pharmacy.update({ where: { id }, data, include: { location: locationSelect } });
+            await tx.auditLog.create({
+                data: {
+                    actorId: actor.id,
+                    actorRole: actor.role,
+                    action: 'PHARMACY_UPDATED',
+                    entityType: 'Pharmacy',
+                    entityId: id,
+                    before: before as any,
+                    after: updated as any,
+                },
+            });
+            return updated;
+        },
+        { maxWait: 10000, timeout: 30000 }
+    );

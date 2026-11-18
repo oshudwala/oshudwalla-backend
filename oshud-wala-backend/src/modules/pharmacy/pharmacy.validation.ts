@@ -23,3 +23,23 @@ export const createPharmacySchema = z.object({
         path: ['latitude'],
     })
 });
+
+
+export const updatePharmacySchema = z.object({
+    params: z.object({ id: z.string().uuid("Invalid pharmacy id") }),
+    body: z.object({
+        name: z.string().trim().min(2).max(120).optional(),
+        nameBn: z.string().trim().min(2).max(100).optional().nullable(),
+        nameHi: z.string().trim().min(2).max(100).optional().nullable(),
+        phone: z.string().trim().regex(/^[0-9]{10,15}$/, "Valid phone number is required").optional(),
+        line1: z.string().trim().min(2).optional(),
+        line2: z.string().trim().optional().nullable(),
+        latitude: lat.optional().nullable(),
+        longitude: lng.optional().nullable(),
+    })
+        .refine((d) => Object.keys(d).length > 0, { message: 'At least one field is required' })
+        .refine((d) => (d.latitude === undefined) === (d.longitude === undefined) && ((d.latitude == null) === (d.longitude == null)), {
+            message: 'latitude and longitude must be provided together',
+            path: ['latitude'],
+        }),
+});

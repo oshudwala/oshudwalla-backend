@@ -26,3 +26,9 @@ export const getMyPharmacies = asyncHandler(async (req: AuthRequest, res: Respon
     const data = await pharmacyService.fetchMyPharmacies(req.user!.userId);
     res.status(200).json(new ApiResponse(200, data, "Your pharmacies retrieved"));
 });
+
+export const updatePharmacyProfile = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const actor = { id: req.user!.userId, role: req.user!.role as RoleName };
+    const data = await pharmacyService.updatePharmacy(req.params.id, req.body, actor);
+    res.status(200).json(new ApiResponse(200, data, "Pharmacy updated successfully"));
+});

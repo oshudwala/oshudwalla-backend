@@ -82,3 +82,37 @@ export const fetchPharmacies = async () => {
 export const fetchMyPharmacies = async (userId: string) => {
     return await pharmacyRepo.findPharmaciesByStaffUser(userId);
 };
+
+// ---------------- Step 3B-2: profile update ----------------
+
+export const updatePharmacy = async (id: string, body: any, actor: Actor) => {
+    const existing = await pharmacyRepo.findPharmacyById(id);
+    if (!existing) throw new ApiError(404, 'Pharmacy not found');
+    if (existing.status !== 'ACTIVE') throw new ApiError(400, 'Pharmacy is not ACTIVE');
+
+    // Super Admin can edit any pharmacy. A PHARMACY user can edit only the pharmacy where they are an active OWNER.
+    if (actor.role !== 'SUPER_ADMIN') {
+        const link = await pharmacyRepo.findActiveOwnerLink(actor.id, id);
+        if (!link) throw new ApiError(403, 'You can only edit your own pharmacy');
+    }
+
+    // explicit whitelist: status, isPrimary, city, locationId and anything else in the body are ignored
+    const data: any = {};
+    if (body.name !== undefined) data.name = String(body.name).trim();
+    if (body.nameBn !== undefined) data.nameBn = body.nameBn ? String(body.nameBn).trim() : null;
+    if (body.nameHi !== undefined) data.nameHi = body.nameHi ? String(body.nameHi).trim() : null;
+    if (body.phone !== undefined) data.phone = String(body.phone).trim();
+    if (body.line1 !== undefined) data.line1 = String(body.line1).trim();
+    if (body.line2 !== undefined) data.line2 = body.line2 ? String(body.line2).trim() : null;
+    if (body.latitude !== undefined) {
+        data.latitude = body.latitude;
+        data.longitude = body.longitude;
+    }
+
+    try {
+        return await pharmacyRepo.updatePharmacyWithAudit(id, existing, data, actor);
+    } catch (error: any) {
+        console.error('Update pharmacy error:', error);
+        throw new ApiError(500, 'Failed to update pharmacy');
+    }
+};
