@@ -37,6 +37,8 @@ export const createPharmacyWithOwner = (data: any, owner: any, actor: Actor) =>
             const pharmacy = await tx.pharmacy.create({
                 data: {
                     name: data.name,
+                    nameBn: data.nameBn ?? null,
+                    nameHi: data.nameHi ?? null,
                     phone: data.phone,
                     email: data.email,
                     line1: data.line1,

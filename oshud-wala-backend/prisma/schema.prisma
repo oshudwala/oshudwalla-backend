@@ -551,6 +551,8 @@ model Address {
 model Pharmacy {
   id            String       @id @default(uuid()) @db.Uuid
   name          String
+  nameBn        String?
+  nameHi        String?
   legalName     String?
   businessRegNo String?      @unique
   licenseNumber String?

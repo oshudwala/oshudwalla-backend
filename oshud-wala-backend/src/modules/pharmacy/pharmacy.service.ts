@@ -31,6 +31,8 @@ export const addPharmacy = async (actor: Actor, data: any) => {
         const result = await pharmacyRepo.createPharmacyWithOwner(
             {
                 name: String(data.name).trim(),
+                nameBn: data.nameBn ? String(data.nameBn).trim() : null,
+                nameHi: data.nameHi ? String(data.nameHi).trim() : null,
                 phone,
                 email: ownerEmail,
                 line1: String(data.line1).trim(),

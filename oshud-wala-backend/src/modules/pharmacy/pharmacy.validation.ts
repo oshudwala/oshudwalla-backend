@@ -6,6 +6,8 @@ const lng = z.number().min(-180).max(180);
 export const createPharmacySchema = z.object({
     body: z.object({
         name: z.string().trim().min(2, "Pharmacy name is required"),
+        nameBn: z.string().trim().min(2).max(100).optional().nullable(),
+        nameHi: z.string().trim().min(2).max(100).optional().nullable(),
         ownerName: z.string().trim().min(2, "Owner name is required"),
         ownerEmail: z.string().trim().email("Invalid owner email"),
         ownerPassword: z.string().min(8, "Password must be at least 8 characters").max(72),

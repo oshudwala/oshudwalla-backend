@@ -22,7 +22,7 @@
 | Admin | GET | `/api/v1/admin/settings` | Yes | SUPER_ADMIN | *None* | Implemented | Passed | Yes |
 | Admin | POST | `/api/v1/admin/settings` | Yes | SUPER_ADMIN | `{"key": "REFERRAL_BONUS", "value": {"coins": 50}}` | Implemented | Passed | Yes |
 | Pharmacy | GET | `/api/v1/pharmacies` | Yes | All | *None* | Implemented | Owner to retest | No |
-| Pharmacy | POST | `/api/v1/pharmacies/admin-create` | Yes | SUPER_ADMIN | `{"name":"Shop","ownerName":"Owner","ownerEmail":"owner-email","ownerPassword":"min8chars","phone":"9876500001","locationId":"uuid","line1":"Main Road","latitude":23.5,"longitude":87.3}` | Implemented | Auto-tested | No |
+| Pharmacy | POST | `/api/v1/pharmacies/admin-create` | Yes | SUPER_ADMIN | `{"name":"Shop","nameBn":"optional","nameHi":"optional","nameBn":"optional","nameHi":"optional","ownerName":"Owner","ownerEmail":"owner-email","ownerPassword":"min8chars","phone":"9876500001","locationId":"uuid","line1":"Main Road","latitude":23.5,"longitude":87.3}` | Implemented | Auto-tested | No |
 | Pharmacy | PUT | `/api/v1/pharmacies/admin-primary/:id` | Yes | SUPER_ADMIN | *None* | Implemented | Owner to retest | No |
 | Doctor | GET | `/api/v1/doctors/pharmacy/:pharmacyId` | Yes | All (needs scoping later) | *None* | Implemented | Owner to retest | No |
 | Doctor | POST | `/api/v1/doctors/onboard` | Yes | SUPER_ADMIN | `{"pharmacyId": "uuid", "fullName": "Dr X", "phone": "9876543211", "specializationId": "uuid", "registrationNumber": "WB123"}` | Implemented | Owner to retest | No |

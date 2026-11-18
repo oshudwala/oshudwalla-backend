@@ -2,6 +2,12 @@
 
 Chronological record of features, code changes, bug fixes, database changes, breaking changes and API changes.
 
+## 2026-11-18 (Step 3B: Bengali and Hindi pharmacy name)
+- Added nullable Pharmacy.nameBn and Pharmacy.nameHi (2 to 100 characters). POST /api/v1/pharmacies/admin-create accepts them and pharmacy lists and /my return them.
+
+## 2026-11-18 (Step 3B: Bengali and Hindi pharmacy name)
+- Added nullable Pharmacy.nameBn and Pharmacy.nameHi (2 to 100 characters). POST /api/v1/pharmacies/admin-create accepts them and pharmacy lists and /my return them.
+
 ## 2026-11-18 (Step 3A-3: Pharmacy + owner account)
 - POST /api/v1/pharmacies/admin-create now creates the pharmacy and its owner login in one transaction (ownerName, ownerEmail, ownerPassword, phone, locationId, line1, optional latitude+longitude). Duplicate phone or email gives 409. Password is hashed and never returned.
 - Removed POST /api/v1/pharmacies/:id/owner. Kept GET /api/v1/pharmacies/my.
