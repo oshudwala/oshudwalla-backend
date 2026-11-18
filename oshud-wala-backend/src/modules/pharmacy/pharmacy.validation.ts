@@ -17,3 +17,9 @@ export const createPharmacySchema = z.object({
         path: ['locationId'],
     })
 });
+
+
+export const assignOwnerSchema = z.object({
+    params: z.object({ id: z.string().uuid() }),
+    body: z.object({ userId: z.string().uuid("Invalid userId") }),
+});

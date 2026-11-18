@@ -481,3 +481,8 @@ Revised order (design v2, pending approval; notification core moves up, Clinic a
 | Deployment | Not started |
 
 **Nothing in this repository has been tested or verified as of this document version.**
+
+
+// Repo: https://github.com/soumya28022005/justwant
+First read AI_HANDOVER.md, DEVELOPMENT_PROGRESS.md and CHANGELOG.md in the repo. Follow the owner rules in AI_HANDOVER.md exactly (Banglish, one small part at a time, terminal commands only, tests before next step, end with "Done sesh" only when the part is fully finished).
+Continue from 3B (Bengali/Hindi pharmacy name). Before writing code, tell me which files you need me to cat.

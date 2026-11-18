@@ -1,3 +1,4 @@
+import { RoleName } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { ApiError } from '../../utils/apiError';
 
@@ -65,3 +66,44 @@ export const getAllPharmacies = async () => {
         include: { location: locationSelect }
     });
 };
+
+// ---------------- Step 3A-2: owner link ----------------
+
+export const findPharmacyById = (id: string) => prisma.pharmacy.findUnique({ where: { id } });
+
+// returns { id, roleName } or null when the user does not exist / has no role
+export const findUserWithRole = async (userId: string) => {
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, roleId: true } });
+    if (!user || !user.roleId) return null;
+    const role = await prisma.role.findUnique({ where: { id: user.roleId } });
+    return { id: user.id, roleName: role ? String(role.name) : null };
+};
+
+export const findStaff = (userId: string, pharmacyId: string) =>
+    prisma.pharmacyStaff.findUnique({ where: { userId_pharmacyId: { userId, pharmacyId } } });
+
+export const findActiveOwner = (pharmacyId: string) =>
+    prisma.pharmacyStaff.findFirst({ where: { pharmacyId, staffRole: 'OWNER', isActive: true } });
+
+export const assignOwnerWithAudit = (pharmacyId: string, userId: string, actor: { id: string; role: RoleName }) =>
+    prisma.$transaction(async (tx) => {
+        const staff = await tx.pharmacyStaff.create({ data: { userId, pharmacyId, staffRole: 'OWNER' } });
+        await tx.auditLog.create({
+            data: {
+                actorId: actor.id,
+                actorRole: actor.role,
+                action: 'PHARMACY_OWNER_ASSIGNED',
+                entityType: 'Pharmacy',
+                entityId: pharmacyId,
+                after: staff as any,
+            },
+        });
+        return staff;
+    });
+
+export const findPharmaciesByStaffUser = (userId: string) =>
+    prisma.pharmacy.findMany({
+        where: { status: 'ACTIVE', staff: { some: { userId, isActive: true } } },
+        orderBy: { createdAt: 'desc' },
+        include: { location: locationSelect },
+    });

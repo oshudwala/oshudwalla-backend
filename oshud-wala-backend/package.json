@@ -13,7 +13,8 @@
     "test:all": "jest --runInBand --forceExit",
     "test:step1": "jest tests/integration/step1-roles.test.ts --runInBand --forceExit",
     "test:location": "jest tests/integration/location.test.ts --runInBand --forceExit",
-    "test:pharmacy-location": "jest tests/integration/pharmacy-location.test.ts --runInBand --forceExit"
+    "test:pharmacy": "jest tests/integration/pharmacy.test.ts --runInBand --forceExit",
+    "test:pharmacy-create": "jest tests/integration/pharmacy-create.test.ts --runInBand --forceExit"
   },
   "author": "SCTECNOIT",
   "license": "ISC",

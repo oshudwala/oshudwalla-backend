@@ -32,5 +32,7 @@
 | Location | POST | `/api/v1/locations` | Yes | SUPER_ADMIN | `{"city":"Durgapur","area":"City Centre","state":"West Bengal","pincode":"713216","latitude":23.5204,"longitude":87.3119}` | Implemented | Owner to test | No |
 | Location | PUT | `/api/v1/locations/:id` | Yes | SUPER_ADMIN | `{"area":"Bidhannagar"}` | Implemented | Owner to test | No |
 | Location | PATCH | `/api/v1/locations/:id/status` | Yes | SUPER_ADMIN | `{"isActive":false}` | Implemented | Owner to test | No |
+| Pharmacy | POST | `/api/v1/pharmacies/:id/owner` | Yes | SUPER_ADMIN | `{"userId":"uuid"}` | Implemented | Auto-tested | No |
+| Pharmacy | GET | `/api/v1/pharmacies/my` | Yes | PHARMACY | *None* | Implemented | Auto-tested | No |
 
 *Note: Detailed API descriptions and live testing are available via the Swagger UI at `https://oshudwalla-backend-1.onrender.com/docs` (Live) or `http://localhost:8000/docs` (Local).*

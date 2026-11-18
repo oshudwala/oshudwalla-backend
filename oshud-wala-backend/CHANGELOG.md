@@ -2,6 +2,11 @@
 
 Chronological record of features, code changes, bug fixes, database changes, breaking changes and API changes.
 
+## 2026-11-18 (Step 3A-2: Pharmacy owner link)
+- Added POST /api/v1/pharmacies/:id/owner (Super Admin links a PHARMACY role user as OWNER via PharmacyStaff, audit logged, duplicate and second-owner protection) and GET /api/v1/pharmacies/my (PHARMACY user sees only own pharmacies).
+- Role is never changed by this endpoint. No schema change.
+- POST /api/v1/pharmacies/admin-create now also accepts locationId (city, state, pincode optional when locationId is given).
+
 ## 2026-11-18 (Step 3A: Pharmacy location link)
 - Added nullable locationId on Pharmacy linked to Location. When locationId is given, city, state and pincode are copied from the Location master. Old way (city, state, pincode) still works.
 - Pharmacy repository now uses shared prisma client and an explicit field whitelist (no body spread).
