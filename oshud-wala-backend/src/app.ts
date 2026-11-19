@@ -19,6 +19,10 @@ if (process.env.NODE_ENV === 'development') {
     app.use(morgan('dev'));
 }
 
+app.get('/', (req: Request, res: Response) => {
+    res.status(200).json({ status: 'OK', message: 'Oshud Wala API is running Soumya and Ayan' });
+});
+
 // Setup Swagger UI
 setupSwagger(app); // Eta add koro
 
