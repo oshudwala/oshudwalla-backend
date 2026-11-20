@@ -73,3 +73,21 @@ export const removePharmacyHoliday = asyncHandler(async (req: AuthRequest, res: 
     const data = await pharmacyService.removePharmacyHoliday(req.params.id, req.params.holidayId, actor);
     res.status(200).json(new ApiResponse(200, data, "Pharmacy holiday removed"));
 });
+
+export const createReceptionist = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const actor = { id: req.user!.userId, role: req.user!.role as RoleName };
+    const data = await pharmacyService.addReceptionist(req.params.id, req.body, actor);
+    res.status(201).json(new ApiResponse(201, data, "Receptionist created successfully"));
+});
+
+export const getReceptionists = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const actor = { id: req.user!.userId, role: req.user!.role as RoleName };
+    const data = await pharmacyService.fetchReceptionists(req.params.id, actor);
+    res.status(200).json(new ApiResponse(200, data, "Receptionists retrieved successfully"));
+});
+
+export const updateReceptionistStatus = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const actor = { id: req.user!.userId, role: req.user!.role as RoleName };
+    const data = await pharmacyService.setReceptionistStatus(req.params.id, req.params.staffId, req.body.isActive, actor);
+    res.status(200).json(new ApiResponse(200, data, "Receptionist status updated successfully"));
+});

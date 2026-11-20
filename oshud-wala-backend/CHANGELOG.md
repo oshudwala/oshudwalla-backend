@@ -112,3 +112,9 @@ Design-level only: v1 table and role names above are replaced. Nothing was migra
 - `PharmacyOpeningHour` and `PharmacyHoliday` tables in Prisma schema.
 - `GET /api/v1/pharmacies/:id/hours`, `PUT /api/v1/pharmacies/:id/hours`, `POST /api/v1/pharmacies/:id/holidays`, `DELETE /api/v1/pharmacies/:id/holidays/:holidayId` with audit logs.
 - Automated Jest suite `tests/integration/pharmacy-hours.test.ts` (12 tests).
+
+## [Step 3G] - 2026-11-21
+### Added
+- `POST /api/v1/pharmacies/:id/receptionists`, `GET /api/v1/pharmacies/:id/receptionists`, and `PATCH /api/v1/pharmacies/:id/receptionists/:staffId/status` (SUPER_ADMIN & own PHARMACY owner).
+- Creates `RECEPTIONIST` user + `PharmacyStaff` row in one transaction with `RECEPTIONIST_CREATED` and `RECEPTIONIST_STATUS_UPDATED` audit logs.
+- Automated Jest suite `tests/integration/pharmacy-receptionist.test.ts` (10 tests).

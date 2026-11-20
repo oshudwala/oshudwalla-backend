@@ -261,3 +261,56 @@ export const removePharmacyHoliday = async (id: string, holidayId: string, actor
         throw new ApiError(500, 'Failed to remove holiday');
     }
 };
+
+// ---------------- Step 3G: Pharmacy Receptionist ----------------
+
+export const addReceptionist = async (pharmacyId: string, body: any, actor: Actor) => {
+    await assertCanEditPharmacy(pharmacyId, actor);
+
+    const phone = String(body.phone).trim();
+    const email = body.email ? String(body.email).trim().toLowerCase() : null;
+
+    const role = await pharmacyRepo.findRoleByName('RECEPTIONIST');
+    if (!role) throw new ApiError(500, 'RECEPTIONIST role not found in database');
+
+    if (await pharmacyRepo.findUserByPhoneOrOptionalEmail(phone, email)) {
+        throw new ApiError(409, 'A user with this phone or email already exists');
+    }
+
+    const passwordHash = await bcrypt.hash(body.password, 10);
+
+    try {
+        return await pharmacyRepo.createReceptionistWithAudit(
+            pharmacyId,
+            {
+                fullName: String(body.fullName).trim(),
+                phone,
+                email,
+                passwordHash,
+                roleId: role.id,
+            },
+            actor
+        );
+    } catch (error: any) {
+        if (error?.code === 'P2002') throw new ApiError(409, 'A user with this phone or email already exists');
+        console.error('Create receptionist error:', error);
+        throw new ApiError(500, 'Failed to create receptionist');
+    }
+};
+
+export const fetchReceptionists = async (pharmacyId: string, actor: Actor) => {
+    await assertCanEditPharmacy(pharmacyId, actor);
+    return await pharmacyRepo.listPharmacyReceptionists(pharmacyId);
+};
+
+export const setReceptionistStatus = async (pharmacyId: string, staffId: string, isActive: boolean, actor: Actor) => {
+    await assertCanEditPharmacy(pharmacyId, actor);
+    const staff = await pharmacyRepo.findReceptionistStaff(pharmacyId, staffId);
+    if (!staff) throw new ApiError(404, 'Receptionist not found for this pharmacy');
+    try {
+        return await pharmacyRepo.updateReceptionistStatusWithAudit(staff, isActive, actor);
+    } catch (error: any) {
+        console.error('Update receptionist status error:', error);
+        throw new ApiError(500, 'Failed to update receptionist status');
+    }
+};

@@ -121,3 +121,27 @@ export const removePharmacyHolidaySchema = z.object({
         holidayId: z.string().uuid("Invalid holiday id"),
     }),
 });
+
+export const createReceptionistSchema = z.object({
+    params: z.object({ id: z.string().uuid("Invalid pharmacy id") }),
+    body: z.object({
+        fullName: z.string().trim().min(2, "Full name is required").max(100),
+        phone: z.string().trim().regex(/^[0-9]{10,15}$/, "Valid phone number is required"),
+        email: z.string().trim().email("Invalid email").optional().nullable(),
+        password: z.string().min(8, "Password must be at least 8 characters").max(72),
+    }),
+});
+
+export const listReceptionistsSchema = z.object({
+    params: z.object({ id: z.string().uuid("Invalid pharmacy id") }),
+});
+
+export const updateReceptionistStatusSchema = z.object({
+    params: z.object({
+        id: z.string().uuid("Invalid pharmacy id"),
+        staffId: z.string().uuid("Invalid staff id"),
+    }),
+    body: z.object({
+        isActive: z.boolean(),
+    }),
+});

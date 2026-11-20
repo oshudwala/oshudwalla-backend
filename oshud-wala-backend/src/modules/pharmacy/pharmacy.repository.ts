@@ -234,3 +234,91 @@ export const deletePharmacyHolidayWithAudit = (pharmacyId: string, holiday: any,
         },
         { maxWait: 10000, timeout: 30000 }
     );
+
+// ---------------- Step 3G: Pharmacy Receptionist ----------------
+
+export const findUserByPhoneOrOptionalEmail = (phone: string, email?: string | null) =>
+    prisma.user.findFirst({
+        where: { OR: email ? [{ phone }, { email }] : [{ phone }] },
+        select: { id: true },
+    });
+
+export const createReceptionistWithAudit = (
+    pharmacyId: string,
+    userData: { fullName: string; phone: string; email: string | null; passwordHash: string; roleId: string },
+    actor: Actor
+) =>
+    prisma.$transaction(
+        async (tx) => {
+            const user = await tx.user.create({
+                data: userData,
+                select: { id: true, fullName: true, phone: true, email: true, status: true },
+            });
+
+            const staff = await tx.pharmacyStaff.create({
+                data: {
+                    userId: user.id,
+                    pharmacyId,
+                    staffRole: 'RECEPTIONIST',
+                    isActive: true,
+                },
+                include: {
+                    user: { select: { id: true, fullName: true, phone: true, email: true, status: true } },
+                },
+            });
+
+            await tx.auditLog.create({
+                data: {
+                    actorId: actor.id,
+                    actorRole: actor.role,
+                    action: 'RECEPTIONIST_CREATED',
+                    entityType: 'PharmacyStaff',
+                    entityId: staff.id,
+                    after: { pharmacyId, staffId: staff.id, userId: user.id, phone: user.phone } as any,
+                },
+            });
+
+            return staff;
+        },
+        { maxWait: 10000, timeout: 30000 }
+    );
+
+export const listPharmacyReceptionists = (pharmacyId: string) =>
+    prisma.pharmacyStaff.findMany({
+        where: { pharmacyId, staffRole: 'RECEPTIONIST' },
+        orderBy: { createdAt: 'desc' },
+        include: {
+            user: { select: { id: true, fullName: true, phone: true, email: true, status: true } },
+        },
+    });
+
+export const findReceptionistStaff = (pharmacyId: string, staffId: string) =>
+    prisma.pharmacyStaff.findFirst({
+        where: { id: staffId, pharmacyId, staffRole: 'RECEPTIONIST' },
+    });
+
+export const updateReceptionistStatusWithAudit = (staff: any, isActive: boolean, actor: Actor) =>
+    prisma.$transaction(
+        async (tx) => {
+            const updated = await tx.pharmacyStaff.update({
+                where: { id: staff.id },
+                data: { isActive },
+                include: {
+                    user: { select: { id: true, fullName: true, phone: true, email: true, status: true } },
+                },
+            });
+            await tx.auditLog.create({
+                data: {
+                    actorId: actor.id,
+                    actorRole: actor.role,
+                    action: 'RECEPTIONIST_STATUS_UPDATED',
+                    entityType: 'PharmacyStaff',
+                    entityId: staff.id,
+                    before: { isActive: staff.isActive } as any,
+                    after: { isActive: updated.isActive } as any,
+                },
+            });
+            return updated;
+        },
+        { maxWait: 10000, timeout: 30000 }
+    );
