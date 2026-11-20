@@ -87,3 +87,10 @@ Design-level only: v1 table and role names above are replaced. Nothing was migra
 
 ### Fixed
 - Prisma schema draft: added missing `auditLogs` relation on `User` (found by schema validation).
+
+## [Step 3B-3] - 2026-11-20
+### Added
+- `PUT /api/v1/pharmacies/admin-update/:id` (SUPER_ADMIN only) to change a pharmacy's `locationId` or `status` (`ACTIVE` / `SUSPENDED`).
+- Syncs `city`, `state`, and `pincode` automatically when `locationId` changes; prevents suspending the Primary Pharmacy.
+- Audit log action `PHARMACY_ADMIN_UPDATED` inside transaction.
+- Automated Jest suite `tests/integration/pharmacy-admin-update.test.ts` (15 tests) and `npm run test:pharmacy-admin-update` script.

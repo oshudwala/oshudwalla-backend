@@ -35,4 +35,6 @@
 | Location | PATCH | `/api/v1/locations/:id/status` | Yes | SUPER_ADMIN | `{"isActive":false}` | Implemented | Owner to test | No |
 | Pharmacy | GET | `/api/v1/pharmacies/my` | Yes | PHARMACY | *None* | Implemented | Auto-tested | No |
 
+| Pharmacy | PUT | `/api/v1/pharmacies/admin-update/:id` | Yes | SUPER_ADMIN | `{"locationId": "uuid", "status": "ACTIVE" \| "SUSPENDED"}` | Implemented | Passed (15/15) | Yes |
+
 *Note: Detailed API descriptions and live testing are available via the Swagger UI at `https://oshudwalla-backend-1.onrender.com/docs` (Live) or `http://localhost:8000/docs` (Local).*

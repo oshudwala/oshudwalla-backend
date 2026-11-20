@@ -120,7 +120,7 @@ export const findPharmacyById = (id: string) => prisma.pharmacy.findUnique({ whe
 export const findActiveOwnerLink = (userId: string, pharmacyId: string) =>
     prisma.pharmacyStaff.findFirst({ where: { userId, pharmacyId, staffRole: 'OWNER', isActive: true } });
 
-export const updatePharmacyWithAudit = (id: string, before: any, data: any, actor: Actor) =>
+export const updatePharmacyWithAudit = (id: string, before: any, data: any, actor: Actor, action = 'PHARMACY_UPDATED') =>
     prisma.$transaction(
         async (tx) => {
             const updated = await tx.pharmacy.update({ where: { id }, data, include: { location: locationSelect } });
@@ -128,7 +128,7 @@ export const updatePharmacyWithAudit = (id: string, before: any, data: any, acto
                 data: {
                     actorId: actor.id,
                     actorRole: actor.role,
-                    action: 'PHARMACY_UPDATED',
+                    action,
                     entityType: 'Pharmacy',
                     entityId: id,
                     before: before as any,

@@ -43,3 +43,13 @@ export const updatePharmacySchema = z.object({
             path: ['latitude'],
         }),
 });
+
+export const adminUpdatePharmacySchema = z.object({
+    params: z.object({ id: z.string().uuid("Invalid pharmacy id") }),
+    body: z.object({
+        locationId: z.string().uuid("Valid locationId is required").optional(),
+        status: z.enum(['ACTIVE', 'SUSPENDED']).optional(),
+    }).refine((d) => d.locationId !== undefined || d.status !== undefined, {
+        message: 'At least one of locationId or status is required',
+    }),
+});

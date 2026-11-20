@@ -116,3 +116,36 @@ export const updatePharmacy = async (id: string, body: any, actor: Actor) => {
         throw new ApiError(500, 'Failed to update pharmacy');
     }
 };
+
+// ---------------- Step 3B-3: Super Admin location/status update ----------------
+
+export const adminUpdatePharmacy = async (id: string, body: any, actor: Actor) => {
+    const existing = await pharmacyRepo.findPharmacyById(id);
+    if (!existing) throw new ApiError(404, 'Pharmacy not found');
+
+    const data: any = {};
+
+    if (body.locationId !== undefined) {
+        const loc = await pharmacyRepo.findLocationById(body.locationId);
+        if (!loc) throw new ApiError(404, 'Location not found');
+        if (!loc.isActive) throw new ApiError(400, 'Location is inactive');
+        data.locationId = loc.id;
+        data.city = loc.city;
+        data.state = loc.state;
+        data.pincode = loc.pincode;
+    }
+
+    if (body.status !== undefined) {
+        if (body.status === 'SUSPENDED' && existing.isPrimary) {
+            throw new ApiError(400, 'Cannot suspend the Primary Pharmacy. Set another pharmacy as Primary first.');
+        }
+        data.status = body.status;
+    }
+
+    try {
+        return await pharmacyRepo.updatePharmacyWithAudit(id, existing, data, actor, 'PHARMACY_ADMIN_UPDATED');
+    } catch (error: any) {
+        console.error('Admin update pharmacy error:', error);
+        throw new ApiError(500, 'Failed to update pharmacy');
+    }
+};
