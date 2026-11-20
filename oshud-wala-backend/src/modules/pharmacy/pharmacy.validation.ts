@@ -82,3 +82,42 @@ export const updatePharmacyServicesSchema = z.object({
         message: 'At least one of hasClinicService or hasMedicineService is required',
     }),
 });
+
+const openingHourItem = z.object({
+    dayOfWeek: z.number().int().min(0).max(6),
+    isClosed: z.boolean().default(false),
+    openMinute: z.number().int().min(0).max(1439).optional().nullable(),
+    closeMinute: z.number().int().min(1).max(1440).optional().nullable(),
+}).refine((d) => {
+    if (d.isClosed) return true;
+    return d.openMinute != null && d.closeMinute != null && d.openMinute < d.closeMinute;
+}, { message: 'When open, openMinute and closeMinute are required and openMinute must be less than closeMinute' });
+
+export const updatePharmacyHoursSchema = z.object({
+    params: z.object({ id: z.string().uuid("Invalid pharmacy id") }),
+    body: z.object({
+        hours: z.array(openingHourItem).min(1, "At least one day is required").max(7),
+    }).refine((d) => new Set(d.hours.map((h) => h.dayOfWeek)).size === d.hours.length, {
+        message: 'Duplicate dayOfWeek entries are not allowed',
+        path: ['hours'],
+    }),
+});
+
+export const getPharmacyHoursSchema = z.object({
+    params: z.object({ id: z.string().uuid("Invalid pharmacy id") }),
+});
+
+export const addPharmacyHolidaySchema = z.object({
+    params: z.object({ id: z.string().uuid("Invalid pharmacy id") }),
+    body: z.object({
+        holidayDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "holidayDate must be YYYY-MM-DD"),
+        reason: z.string().trim().min(2).max(200).optional().nullable(),
+    }),
+});
+
+export const removePharmacyHolidaySchema = z.object({
+    params: z.object({
+        id: z.string().uuid("Invalid pharmacy id"),
+        holidayId: z.string().uuid("Invalid holiday id"),
+    }),
+});

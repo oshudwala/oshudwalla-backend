@@ -593,6 +593,8 @@ model Pharmacy {
   pickupQrs       PickupQr[]
   wallet          Wallet?
   commissionRules CommissionRule[]
+  hours           PharmacyOpeningHour[]
+  holidays        PharmacyHoliday[]
   location        Location?    @relation(fields: [locationId], references: [id])
 
   @@index([city, status])
@@ -1527,4 +1529,31 @@ model SupportMessage {
 
   @@index([ticketId, createdAt])
   @@map("support_messages")
+}
+
+model PharmacyOpeningHour {
+  id          String   @id @default(uuid()) @db.Uuid
+  pharmacyId  String   @db.Uuid
+  pharmacy    Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  dayOfWeek   Int      // 0 = Sunday ... 6 = Saturday
+  openMinute  Int?     // 0..1439 (null when isClosed = true)
+  closeMinute Int?     // 1..1440 (null when isClosed = true)
+  isClosed    Boolean  @default(false)
+
+  @@unique([pharmacyId, dayOfWeek])
+  @@index([pharmacyId])
+  @@map("pharmacy_opening_hours")
+}
+
+model PharmacyHoliday {
+  id          String   @id @default(uuid()) @db.Uuid
+  pharmacyId  String   @db.Uuid
+  pharmacy    Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  holidayDate DateTime @db.Date
+  reason      String?
+  createdAt   DateTime @default(now())
+
+  @@unique([pharmacyId, holidayDate])
+  @@index([pharmacyId, holidayDate])
+  @@map("pharmacy_holidays")
 }

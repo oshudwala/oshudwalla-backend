@@ -205,3 +205,59 @@ export const updatePharmacyServices = async (id: string, body: any, actor: Actor
         throw new ApiError(500, 'Failed to update pharmacy services');
     }
 };
+
+// ---------------- Step 3E: Opening hours & holidays ----------------
+
+const assertCanEditPharmacy = async (id: string, actor: Actor) => {
+    const existing = await pharmacyRepo.findPharmacyById(id);
+    if (!existing) throw new ApiError(404, 'Pharmacy not found');
+    if (existing.status !== 'ACTIVE') throw new ApiError(400, 'Pharmacy is not ACTIVE');
+    if (actor.role !== 'SUPER_ADMIN') {
+        const link = await pharmacyRepo.findActiveOwnerLink(actor.id, id);
+        if (!link) throw new ApiError(403, 'You can only edit your own pharmacy');
+    }
+    return existing;
+};
+
+export const fetchPharmacyHours = async (id: string) => {
+    const existing = await pharmacyRepo.findPharmacyById(id);
+    if (!existing) throw new ApiError(404, 'Pharmacy not found');
+    return await pharmacyRepo.getPharmacyHoursAndHolidays(id);
+};
+
+export const updatePharmacyHours = async (id: string, body: any, actor: Actor) => {
+    await assertCanEditPharmacy(id, actor);
+    try {
+        return await pharmacyRepo.replacePharmacyHoursWithAudit(id, body.hours, actor);
+    } catch (error: any) {
+        console.error('Update pharmacy hours error:', error);
+        throw new ApiError(500, 'Failed to update pharmacy hours');
+    }
+};
+
+export const addPharmacyHoliday = async (id: string, body: any, actor: Actor) => {
+    await assertCanEditPharmacy(id, actor);
+    const dateObj = new Date(`${body.holidayDate}T00:00:00.000Z`);
+    if (Number.isNaN(dateObj.getTime())) throw new ApiError(400, 'Invalid holidayDate');
+    const reason = body.reason ? String(body.reason).trim() : null;
+    try {
+        return await pharmacyRepo.createPharmacyHolidayWithAudit(id, dateObj, reason, actor);
+    } catch (error: any) {
+        if (error?.code === 'P2002') throw new ApiError(409, 'Holiday already exists for this date');
+        console.error('Add pharmacy holiday error:', error);
+        throw new ApiError(500, 'Failed to add holiday');
+    }
+};
+
+export const removePharmacyHoliday = async (id: string, holidayId: string, actor: Actor) => {
+    await assertCanEditPharmacy(id, actor);
+    const holiday = await pharmacyRepo.findPharmacyHoliday(id, holidayId);
+    if (!holiday) throw new ApiError(404, 'Holiday not found');
+    try {
+        await pharmacyRepo.deletePharmacyHolidayWithAudit(id, holiday, actor);
+        return { deleted: true };
+    } catch (error: any) {
+        console.error('Remove pharmacy holiday error:', error);
+        throw new ApiError(500, 'Failed to remove holiday');
+    }
+};

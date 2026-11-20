@@ -28,3 +28,5 @@ Previous "23 passed" claim is NOT verified: `establishment.test.ts` referenced a
 - **Step 3C (2026-11-21)**: Added `coverUrl` and `galleryUrls` to `Pharmacy` and `PUT /api/v1/pharmacies/:id/media` (SUPER_ADMIN & own PHARMACY owner) with `PHARMACY_MEDIA_UPDATED` audit log and 12 Jest tests.
 
 - **Step 3D (2026-11-21)**: Added `hasClinicService` and `hasMedicineService` to `Pharmacy` and `PUT /api/v1/pharmacies/:id/services` (SUPER_ADMIN & own PHARMACY owner; at least one service must remain enabled) with `PHARMACY_SERVICES_UPDATED` audit log and 12 Jest tests.
+
+- **Step 3E (2026-11-21)**: Added `PharmacyOpeningHour` & `PharmacyHoliday` models and `GET/PUT /:id/hours`, `POST /:id/holidays`, `DELETE /:id/holidays/:holidayId` with audit logs and 12 Jest tests.

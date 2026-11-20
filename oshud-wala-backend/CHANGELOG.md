@@ -106,3 +106,9 @@ Design-level only: v1 table and role names above are replaced. Nothing was migra
 - `hasClinicService` (default `false`) and `hasMedicineService` (default `true`) on `Pharmacy`.
 - `PUT /api/v1/pharmacies/:id/services` (SUPER_ADMIN & own PHARMACY owner) preventing disabling both services simultaneously, with `PHARMACY_SERVICES_UPDATED` audit log.
 - Automated Jest suite `tests/integration/pharmacy-services.test.ts` (12 tests).
+
+## [Step 3E] - 2026-11-21
+### Added
+- `PharmacyOpeningHour` and `PharmacyHoliday` tables in Prisma schema.
+- `GET /api/v1/pharmacies/:id/hours`, `PUT /api/v1/pharmacies/:id/hours`, `POST /api/v1/pharmacies/:id/holidays`, `DELETE /api/v1/pharmacies/:id/holidays/:holidayId` with audit logs.
+- Automated Jest suite `tests/integration/pharmacy-hours.test.ts` (12 tests).

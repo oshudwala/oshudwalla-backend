@@ -139,3 +139,98 @@ export const updatePharmacyWithAudit = (id: string, before: any, data: any, acto
         },
         { maxWait: 10000, timeout: 30000 }
     );
+
+// ---------------- Step 3E: Opening hours & holidays ----------------
+
+export const getPharmacyHoursAndHolidays = async (pharmacyId: string) => {
+    const [hours, holidays] = await prisma.$transaction([
+        prisma.pharmacyOpeningHour.findMany({
+            where: { pharmacyId },
+            orderBy: { dayOfWeek: 'asc' },
+        }),
+        prisma.pharmacyHoliday.findMany({
+            where: { pharmacyId },
+            orderBy: { holidayDate: 'asc' },
+        }),
+    ]);
+    return { hours, holidays };
+};
+
+export const replacePharmacyHoursWithAudit = (pharmacyId: string, hours: any[], actor: Actor) =>
+    prisma.$transaction(
+        async (tx) => {
+            const before = await tx.pharmacyOpeningHour.findMany({
+                where: { pharmacyId },
+                orderBy: { dayOfWeek: 'asc' },
+            });
+            await tx.pharmacyOpeningHour.deleteMany({ where: { pharmacyId } });
+            await tx.pharmacyOpeningHour.createMany({
+                data: hours.map((h) => ({
+                    pharmacyId,
+                    dayOfWeek: h.dayOfWeek,
+                    isClosed: Boolean(h.isClosed),
+                    openMinute: h.isClosed ? null : h.openMinute,
+                    closeMinute: h.isClosed ? null : h.closeMinute,
+                })),
+            });
+            const after = await tx.pharmacyOpeningHour.findMany({
+                where: { pharmacyId },
+                orderBy: { dayOfWeek: 'asc' },
+            });
+            await tx.auditLog.create({
+                data: {
+                    actorId: actor.id,
+                    actorRole: actor.role,
+                    action: 'PHARMACY_HOURS_UPDATED',
+                    entityType: 'Pharmacy',
+                    entityId: pharmacyId,
+                    before: before as any,
+                    after: after as any,
+                },
+            });
+            return after;
+        },
+        { maxWait: 10000, timeout: 30000 }
+    );
+
+export const createPharmacyHolidayWithAudit = (pharmacyId: string, holidayDate: Date, reason: string | null, actor: Actor) =>
+    prisma.$transaction(
+        async (tx) => {
+            const created = await tx.pharmacyHoliday.create({
+                data: { pharmacyId, holidayDate, reason },
+            });
+            await tx.auditLog.create({
+                data: {
+                    actorId: actor.id,
+                    actorRole: actor.role,
+                    action: 'PHARMACY_HOLIDAY_ADDED',
+                    entityType: 'Pharmacy',
+                    entityId: pharmacyId,
+                    after: created as any,
+                },
+            });
+            return created;
+        },
+        { maxWait: 10000, timeout: 30000 }
+    );
+
+export const findPharmacyHoliday = (pharmacyId: string, holidayId: string) =>
+    prisma.pharmacyHoliday.findFirst({ where: { id: holidayId, pharmacyId } });
+
+export const deletePharmacyHolidayWithAudit = (pharmacyId: string, holiday: any, actor: Actor) =>
+    prisma.$transaction(
+        async (tx) => {
+            await tx.pharmacyHoliday.delete({ where: { id: holiday.id } });
+            await tx.auditLog.create({
+                data: {
+                    actorId: actor.id,
+                    actorRole: actor.role,
+                    action: 'PHARMACY_HOLIDAY_REMOVED',
+                    entityType: 'Pharmacy',
+                    entityId: pharmacyId,
+                    before: holiday as any,
+                },
+            });
+        },
+        { maxWait: 10000, timeout: 30000 }
+    );

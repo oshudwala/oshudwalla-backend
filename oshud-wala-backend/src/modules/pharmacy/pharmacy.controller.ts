@@ -50,3 +50,26 @@ export const updatePharmacyServices = asyncHandler(async (req: AuthRequest, res:
     const data = await pharmacyService.updatePharmacyServices(req.params.id, req.body, actor);
     res.status(200).json(new ApiResponse(200, data, "Pharmacy services updated successfully"));
 });
+
+export const getPharmacyHours = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const data = await pharmacyService.fetchPharmacyHours(req.params.id);
+    res.status(200).json(new ApiResponse(200, data, "Pharmacy hours and holidays retrieved"));
+});
+
+export const updatePharmacyHours = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const actor = { id: req.user!.userId, role: req.user!.role as RoleName };
+    const data = await pharmacyService.updatePharmacyHours(req.params.id, req.body, actor);
+    res.status(200).json(new ApiResponse(200, data, "Pharmacy opening hours updated"));
+});
+
+export const addPharmacyHoliday = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const actor = { id: req.user!.userId, role: req.user!.role as RoleName };
+    const data = await pharmacyService.addPharmacyHoliday(req.params.id, req.body, actor);
+    res.status(201).json(new ApiResponse(201, data, "Pharmacy holiday added"));
+});
+
+export const removePharmacyHoliday = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const actor = { id: req.user!.userId, role: req.user!.role as RoleName };
+    const data = await pharmacyService.removePharmacyHoliday(req.params.id, req.params.holidayId, actor);
+    res.status(200).json(new ApiResponse(200, data, "Pharmacy holiday removed"));
+});
