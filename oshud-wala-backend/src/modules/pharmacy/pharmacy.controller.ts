@@ -44,3 +44,9 @@ export const updatePharmacyMedia = asyncHandler(async (req: AuthRequest, res: Re
     const data = await pharmacyService.updatePharmacyMedia(req.params.id, req.body, actor);
     res.status(200).json(new ApiResponse(200, data, "Pharmacy media updated successfully"));
 });
+
+export const updatePharmacyServices = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const actor = { id: req.user!.userId, role: req.user!.role as RoleName };
+    const data = await pharmacyService.updatePharmacyServices(req.params.id, req.body, actor);
+    res.status(200).json(new ApiResponse(200, data, "Pharmacy services updated successfully"));
+});

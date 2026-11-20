@@ -562,6 +562,8 @@ model Pharmacy {
   logoUrl       String?
   coverUrl      String?
   galleryUrls   String[]     @default([])
+  hasClinicService   Boolean      @default(false)
+  hasMedicineService Boolean      @default(true)
   line1         String
   line2         String?
   landmark      String?

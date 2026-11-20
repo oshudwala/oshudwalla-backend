@@ -174,3 +174,34 @@ export const updatePharmacyMedia = async (id: string, body: any, actor: Actor) =
         throw new ApiError(500, 'Failed to update pharmacy media');
     }
 };
+
+// ---------------- Step 3D: Clinic / Medicine service toggle ----------------
+
+export const updatePharmacyServices = async (id: string, body: any, actor: Actor) => {
+    const existing = await pharmacyRepo.findPharmacyById(id);
+    if (!existing) throw new ApiError(404, 'Pharmacy not found');
+    if (existing.status !== 'ACTIVE') throw new ApiError(400, 'Pharmacy is not ACTIVE');
+
+    if (actor.role !== 'SUPER_ADMIN') {
+        const link = await pharmacyRepo.findActiveOwnerLink(actor.id, id);
+        if (!link) throw new ApiError(403, 'You can only edit your own pharmacy');
+    }
+
+    const nextClinic = body.hasClinicService !== undefined ? body.hasClinicService : existing.hasClinicService;
+    const nextMedicine = body.hasMedicineService !== undefined ? body.hasMedicineService : existing.hasMedicineService;
+
+    if (!nextClinic && !nextMedicine) {
+        throw new ApiError(400, 'At least one service (Clinic or Medicine) must remain enabled');
+    }
+
+    const data: any = {};
+    if (body.hasClinicService !== undefined) data.hasClinicService = body.hasClinicService;
+    if (body.hasMedicineService !== undefined) data.hasMedicineService = body.hasMedicineService;
+
+    try {
+        return await pharmacyRepo.updatePharmacyWithAudit(id, existing, data, actor, 'PHARMACY_SERVICES_UPDATED');
+    } catch (error: any) {
+        console.error('Update pharmacy services error:', error);
+        throw new ApiError(500, 'Failed to update pharmacy services');
+    }
+};

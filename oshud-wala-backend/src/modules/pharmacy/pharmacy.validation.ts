@@ -72,3 +72,13 @@ export const updatePharmacyMediaSchema = z.object({
         message: 'At least one of logoUrl, coverUrl, or galleryUrls is required',
     }),
 });
+
+export const updatePharmacyServicesSchema = z.object({
+    params: z.object({ id: z.string().uuid("Invalid pharmacy id") }),
+    body: z.object({
+        hasClinicService: z.boolean().optional(),
+        hasMedicineService: z.boolean().optional(),
+    }).refine((d) => d.hasClinicService !== undefined || d.hasMedicineService !== undefined, {
+        message: 'At least one of hasClinicService or hasMedicineService is required',
+    }),
+});
