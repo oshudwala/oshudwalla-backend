@@ -53,3 +53,22 @@ export const adminUpdatePharmacySchema = z.object({
         message: 'At least one of locationId or status is required',
     }),
 });
+
+const httpUrl = z
+    .string()
+    .trim()
+    .url("Must be a valid URL")
+    .refine((u) => u.startsWith('http://') || u.startsWith('https://'), {
+        message: 'URL must start with http:// or https://',
+    });
+
+export const updatePharmacyMediaSchema = z.object({
+    params: z.object({ id: z.string().uuid("Invalid pharmacy id") }),
+    body: z.object({
+        logoUrl: httpUrl.optional().nullable(),
+        coverUrl: httpUrl.optional().nullable(),
+        galleryUrls: z.array(httpUrl).max(10, "Maximum 10 gallery images allowed").optional(),
+    }).refine((d) => d.logoUrl !== undefined || d.coverUrl !== undefined || d.galleryUrls !== undefined, {
+        message: 'At least one of logoUrl, coverUrl, or galleryUrls is required',
+    }),
+});

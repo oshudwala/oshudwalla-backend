@@ -149,3 +149,28 @@ export const adminUpdatePharmacy = async (id: string, body: any, actor: Actor) =
         throw new ApiError(500, 'Failed to update pharmacy');
     }
 };
+
+// ---------------- Step 3C: Pharmacy media (logo, cover, gallery) ----------------
+
+export const updatePharmacyMedia = async (id: string, body: any, actor: Actor) => {
+    const existing = await pharmacyRepo.findPharmacyById(id);
+    if (!existing) throw new ApiError(404, 'Pharmacy not found');
+    if (existing.status !== 'ACTIVE') throw new ApiError(400, 'Pharmacy is not ACTIVE');
+
+    if (actor.role !== 'SUPER_ADMIN') {
+        const link = await pharmacyRepo.findActiveOwnerLink(actor.id, id);
+        if (!link) throw new ApiError(403, 'You can only edit your own pharmacy');
+    }
+
+    const data: any = {};
+    if (body.logoUrl !== undefined) data.logoUrl = body.logoUrl;
+    if (body.coverUrl !== undefined) data.coverUrl = body.coverUrl;
+    if (body.galleryUrls !== undefined) data.galleryUrls = body.galleryUrls;
+
+    try {
+        return await pharmacyRepo.updatePharmacyWithAudit(id, existing, data, actor, 'PHARMACY_MEDIA_UPDATED');
+    } catch (error: any) {
+        console.error('Update pharmacy media error:', error);
+        throw new ApiError(500, 'Failed to update pharmacy media');
+    }
+};

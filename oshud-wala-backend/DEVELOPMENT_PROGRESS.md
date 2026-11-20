@@ -24,3 +24,5 @@ IN DEVELOPMENT. Re-baselined after repo audit (18 Nov 2026). Earlier "Establishm
 Previous "23 passed" claim is NOT verified: `establishment.test.ts` referenced a model/route that no longer exists. Test run results are recorded in TEST_REPORT.md only after the owner runs them.
 
 - **Step 3B-3 (2026-11-20)**: Added `PUT /api/v1/pharmacies/admin-update/:id` (SUPER_ADMIN only) to update pharmacy `locationId` (syncs city/state/pincode from active Location) and `status` (`ACTIVE`/`SUSPENDED`, blocks suspending Primary Pharmacy), with `PHARMACY_ADMIN_UPDATED` audit log and 15 Jest integration tests.
+
+- **Step 3C (2026-11-21)**: Added `coverUrl` and `galleryUrls` to `Pharmacy` and `PUT /api/v1/pharmacies/:id/media` (SUPER_ADMIN & own PHARMACY owner) with `PHARMACY_MEDIA_UPDATED` audit log and 12 Jest tests.

@@ -17,7 +17,8 @@
     "test:pharmacy-create": "jest tests/integration/pharmacy-create.test.ts --runInBand --forceExit",
     "test:pharmacy-names": "jest tests/integration/pharmacy-names.test.ts --runInBand --forceExit",
     "test:pharmacy-update": "jest tests/integration/pharmacy-update.test.ts --runInBand --forceExit",
-    "test:pharmacy-admin-update": "jest tests/integration/pharmacy-admin-update.test.ts --forceExit"
+    "test:pharmacy-admin-update": "jest tests/integration/pharmacy-admin-update.test.ts --forceExit",
+    "test:pharmacy-media": "jest tests/integration/pharmacy-media.test.ts --forceExit"
   },
   "author": "SCTECNOIT",
   "license": "ISC",

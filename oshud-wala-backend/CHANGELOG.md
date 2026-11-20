@@ -94,3 +94,9 @@ Design-level only: v1 table and role names above are replaced. Nothing was migra
 - Syncs `city`, `state`, and `pincode` automatically when `locationId` changes; prevents suspending the Primary Pharmacy.
 - Audit log action `PHARMACY_ADMIN_UPDATED` inside transaction.
 - Automated Jest suite `tests/integration/pharmacy-admin-update.test.ts` (15 tests) and `npm run test:pharmacy-admin-update` script.
+
+## [Step 3C] - 2026-11-21
+### Added
+- `coverUrl` and `galleryUrls` fields on `Pharmacy`.
+- `PUT /api/v1/pharmacies/:id/media` (SUPER_ADMIN & own PHARMACY owner) with HTTP/HTTPS URL validation, max 10 gallery images, and `PHARMACY_MEDIA_UPDATED` audit log.
+- Automated Jest suite `tests/integration/pharmacy-media.test.ts` (12 tests).

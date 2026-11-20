@@ -560,6 +560,8 @@ model Pharmacy {
   email         String?
   website       String?
   logoUrl       String?
+  coverUrl      String?
+  galleryUrls   String[]     @default([])
   line1         String
   line2         String?
   landmark      String?
