@@ -132,3 +132,8 @@ Design-level only: v1 table and role names above are replaced. Nothing was migra
 - `POST /api/v1/auth/send-otp`, `POST /api/v1/auth/register-otp`, `POST /api/v1/auth/login-otp/send`, `POST /api/v1/auth/login-otp/verify` (PATIENT role only for OTP login).
 - Switched `auth.repository.ts` to shared `prisma` client and updated `API_REGISTRY.md`.
 - Automated Jest suite `tests/integration/auth-otp.test.ts` (9 tests).
+
+## [Step 5] - 2026-11-21
+### Added
+- `src/modules/schedule/` mounted at `/api/v1/schedules` (weekly schedules, exceptions, automated slot generation up to 31 days, slot status toggle).
+- Automated Jest suite `tests/integration/schedule.test.ts` (9 tests).

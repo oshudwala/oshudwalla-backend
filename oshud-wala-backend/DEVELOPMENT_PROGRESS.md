@@ -36,3 +36,5 @@ Previous "23 passed" claim is NOT verified: `establishment.test.ts` referenced a
 - **Auth OTP (2026-11-21)**: Added APITXT (without DLT) + Redis OTP for Patient registration (`/send-otp`, `/register-otp`) and Patient-only OTP login (`/login-otp/send`, `/login-otp/verify`), rate limit 3/min, SHA-256 hash, shared Prisma client in `auth.repository.ts`, and 9 Jest tests.
 
 - **Auth OTP (2026-11-21)**: Added APITXT (without DLT) + Redis OTP for Patient registration (`/send-otp`, `/register-otp`) and Patient-only OTP login (`/login-otp/send`, `/login-otp/verify`), rate limit 3/min, SHA-256 hash, shared Prisma client in `auth.repository.ts`, and 9 Jest tests.
+
+- **Step 5 (2026-11-21)**: Added Doctor weekly schedules, LEAVE/MODIFIED_HOURS exceptions, idempotent slot generation (respects pharmacy holidays & leaves), slot OPEN/BLOCKED toggle, and 9 Jest tests.

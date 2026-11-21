@@ -58,3 +58,9 @@
 | Doctor | PATCH | `/api/v1/doctors/assign/:assignmentId/status` | Yes | SUPER_ADMIN, PHARMACY (own) | `{"isActive":false}` | Implemented | Passed (11/11) | Yes |
 
 *Note: Detailed API descriptions and live testing are available via the Swagger UI at `https://oshudwalla-backend-1.onrender.com/docs` (Live) or `http://localhost:8000/docs` (Local).*
+| Schedule | POST | `/api/v1/schedules` | Yes | SUPER_ADMIN, PHARMACY (own), DOCTOR (own) | `{"pharmacyDoctorId":"uuid","dayOfWeek":1,"startMinute":600,"endMinute":690,"slotDurationMinutes":30,"slotCapacity":2,"validFrom":"2026-12-01"}` | Implemented | Passed (9/9) | Yes |
+| Schedule | GET | `/api/v1/schedules/pharmacy-doctor/:pharmacyDoctorId` | Yes | All | *None* | Implemented | Passed (9/9) | Yes |
+| Schedule | POST | `/api/v1/schedules/exceptions` | Yes | SUPER_ADMIN, PHARMACY (own), DOCTOR (own) | `{"pharmacyDoctorId":"uuid","exceptionDate":"2026-12-08","type":"LEAVE","reason":"Conference"}` | Implemented | Passed (9/9) | Yes |
+| Schedule | POST | `/api/v1/schedules/generate-slots` | Yes | SUPER_ADMIN, PHARMACY (own), DOCTOR (own) | `{"pharmacyDoctorId":"uuid","fromDate":"2026-12-07","toDate":"2026-12-08"}` | Implemented | Passed (9/9) | Yes |
+| Schedule | GET | `/api/v1/schedules/slots/:pharmacyDoctorId` | Yes | All | query: `date` or `fromDate, toDate` | Implemented | Passed (9/9) | Yes |
+| Schedule | PATCH | `/api/v1/schedules/slots/:slotId/status` | Yes | SUPER_ADMIN, PHARMACY (own), DOCTOR (own) | `{"status":"BLOCKED"}` | Implemented | Passed (9/9) | Yes |
