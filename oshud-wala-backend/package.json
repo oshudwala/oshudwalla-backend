@@ -23,7 +23,8 @@
     "test:pharmacy-hours": "jest tests/integration/pharmacy-hours.test.ts --forceExit",
     "test:pharmacy-receptionist": "jest tests/integration/pharmacy-receptionist.test.ts --forceExit",
     "test:doctor-step4": "jest tests/integration/doctor-step4.test.ts --forceExit",
-    "test:auth-otp": "jest tests/integration/auth-otp.test.ts --forceExit"
+    "test:auth-otp": "jest tests/integration/auth-otp.test.ts --forceExit",
+    "test:schedule": "jest tests/integration/schedule.test.ts --forceExit"
   },
   "author": "SCTECNOIT",
   "license": "ISC",
