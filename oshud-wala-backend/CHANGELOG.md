@@ -137,3 +137,8 @@ Design-level only: v1 table and role names above are replaced. Nothing was migra
 ### Added
 - `src/modules/schedule/` mounted at `/api/v1/schedules` (weekly schedules, exceptions, automated slot generation up to 31 days, slot status toggle).
 - Automated Jest suite `tests/integration/schedule.test.ts` (9 tests).
+
+## [Step 5] - 2026-11-21
+### Added
+- `src/modules/schedule/` mounted at `/api/v1/schedules` (weekly schedules, exceptions, automated slot generation up to 31 days, slot status toggle).
+- Automated Jest suite `tests/integration/schedule.test.ts` (9 tests).

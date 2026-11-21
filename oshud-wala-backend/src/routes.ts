@@ -8,6 +8,7 @@ import doctorRoutes from './modules/doctor/doctor.routes';
 import pharmacyRoutes from './modules/pharmacy/pharmacy.routes';
 import locationRoutes from './modules/location/location.routes';
 import scheduleRoutes from './modules/schedule/schedule.routes';
+import appointmentRoutes from './modules/appointment/appointment.routes';
 
 const router = Router();
 
@@ -20,5 +21,6 @@ router.use('/doctors', doctorRoutes); // doctors
 router.use('/pharmacies', pharmacyRoutes);
 router.use('/locations', locationRoutes);
 router.use('/schedules', scheduleRoutes);
+router.use('/appointments', appointmentRoutes);
 
 export default router;
