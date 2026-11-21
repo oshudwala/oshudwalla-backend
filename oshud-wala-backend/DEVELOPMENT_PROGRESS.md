@@ -32,3 +32,5 @@ Previous "23 passed" claim is NOT verified: `establishment.test.ts` referenced a
 - **Step 3E (2026-11-21)**: Added `PharmacyOpeningHour` & `PharmacyHoliday` models and `GET/PUT /:id/hours`, `POST /:id/holidays`, `DELETE /:id/holidays/:holidayId` with audit logs and 12 Jest tests.
 
 - **Step 3G (2026-11-21)**: Added Pharmacy Receptionist management (`POST/GET /:id/receptionists`, `PATCH /:id/receptionists/:staffId/status`) with `RECEPTIONIST` role login, audit logs, and 10 Jest tests. Step 3 (Pharmacy Upgrade) complete.
+
+- **Auth OTP (2026-11-21)**: Added APITXT (without DLT) + Redis OTP for Patient registration (`/send-otp`, `/register-otp`) and Patient-only OTP login (`/login-otp/send`, `/login-otp/verify`), rate limit 3/min, SHA-256 hash, shared Prisma client in `auth.repository.ts`, and 9 Jest tests.

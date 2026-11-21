@@ -118,3 +118,10 @@ Design-level only: v1 table and role names above are replaced. Nothing was migra
 - `POST /api/v1/pharmacies/:id/receptionists`, `GET /api/v1/pharmacies/:id/receptionists`, and `PATCH /api/v1/pharmacies/:id/receptionists/:staffId/status` (SUPER_ADMIN & own PHARMACY owner).
 - Creates `RECEPTIONIST` user + `PharmacyStaff` row in one transaction with `RECEPTIONIST_CREATED` and `RECEPTIONIST_STATUS_UPDATED` audit logs.
 - Automated Jest suite `tests/integration/pharmacy-receptionist.test.ts` (10 tests).
+
+## [Auth OTP] - 2026-11-21
+### Added
+- `src/utils/apitxt.util.ts` for APITXT SMS OTP (without DLT) with dry-run in test mode.
+- `POST /api/v1/auth/send-otp`, `POST /api/v1/auth/register-otp`, `POST /api/v1/auth/login-otp/send`, `POST /api/v1/auth/login-otp/verify` (PATIENT role only for OTP login).
+- Switched `auth.repository.ts` to shared `prisma` client and updated `API_REGISTRY.md`.
+- Automated Jest suite `tests/integration/auth-otp.test.ts` (9 tests).

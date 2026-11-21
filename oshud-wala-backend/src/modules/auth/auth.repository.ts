@@ -1,6 +1,6 @@
-import { PrismaClient, RoleName } from '@prisma/client';
+import { RoleName } from '@prisma/client';
+import { prisma } from '../../config/prisma';
 
-const prisma = new PrismaClient();
 
 export const findUserByPhoneOrEmail = async (phone: string, email?: string) => {
     return await prisma.user.findFirst({

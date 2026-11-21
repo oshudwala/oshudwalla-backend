@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { register, login, refresh, logout } from './auth.controller';
+import { register, login, refresh, logout, sendOtp, registerWithOtp, sendLoginOtp, verifyLoginOtp } from './auth.controller';
 import { validate } from '../../middlewares/validate.middleware';
-import { registerSchema, loginSchema, refreshSchema } from './auth.validation';
+import { registerSchema, loginSchema, refreshSchema, sendRegisterOtpSchema, registerWithOtpSchema, sendLoginOtpSchema, verifyLoginOtpSchema } from './auth.validation';
 import { authenticate } from '../../middlewares/auth.middleware';
 
 const router = Router();
@@ -36,6 +36,8 @@ const router = Router();
  *         description: User registered successfully
  */
 router.post('/register', validate(registerSchema), register);
+router.post('/send-otp', validate(sendRegisterOtpSchema), sendOtp);
+router.post('/register-otp', validate(registerWithOtpSchema), registerWithOtp);
 
 /**
  * @swagger
@@ -58,6 +60,8 @@ router.post('/register', validate(registerSchema), register);
  *         description: Login successful, returns tokens
  */
 router.post('/login', validate(loginSchema), login);
+router.post('/login-otp/send', validate(sendLoginOtpSchema), sendLoginOtp);
+router.post('/login-otp/verify', validate(verifyLoginOtpSchema), verifyLoginOtp);
 
 /**
  * @swagger
