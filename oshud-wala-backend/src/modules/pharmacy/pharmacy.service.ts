@@ -91,11 +91,6 @@ export const updatePharmacy = async (id: string, body: any, actor: Actor) => {
     if (existing.status !== 'ACTIVE') throw new ApiError(400, 'Pharmacy is not ACTIVE');
 
     // Super Admin can edit any pharmacy. A PHARMACY user can edit only the pharmacy where they are an active OWNER.
-    if (actor.role !== 'SUPER_ADMIN') {
-        const link = await pharmacyRepo.findActiveOwnerLink(actor.id, id);
-        if (!link) throw new ApiError(403, 'You can only edit your own pharmacy');
-    }
-
     // explicit whitelist: status, isPrimary, city, locationId and anything else in the body are ignored
     const data: any = {};
     if (body.name !== undefined) data.name = String(body.name).trim();

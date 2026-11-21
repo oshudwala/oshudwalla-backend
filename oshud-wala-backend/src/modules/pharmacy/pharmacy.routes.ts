@@ -21,7 +21,7 @@ router.put('/admin-update/:id', authorizeRoles('SUPER_ADMIN'), validate(adminUpd
 
 // SUPER_ADMIN (any pharmacy) or PHARMACY owner (own pharmacy only, checked in the service)
 router.put('/:id/media', authorizeRoles('SUPER_ADMIN', 'PHARMACY'), validate(updatePharmacyMediaSchema), updatePharmacyMedia);
-router.put('/:id/services', authorizeRoles('SUPER_ADMIN', 'PHARMACY'), validate(updatePharmacyServicesSchema), updatePharmacyServices);
+router.put('/:id/services', authorizeRoles('SUPER_ADMIN'), validate(updatePharmacyServicesSchema), updatePharmacyServices);
 router.get('/:id/hours', validate(getPharmacyHoursSchema), getPharmacyHours);
 router.put('/:id/hours', authorizeRoles('SUPER_ADMIN', 'PHARMACY'), validate(updatePharmacyHoursSchema), updatePharmacyHours);
 router.post('/:id/holidays', authorizeRoles('SUPER_ADMIN', 'PHARMACY'), validate(addPharmacyHolidaySchema), addPharmacyHoliday);

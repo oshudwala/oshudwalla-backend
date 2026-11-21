@@ -4,13 +4,11 @@ import { prisma } from '../../src/config/prisma';
 
 jest.setTimeout(180000);
 
-describe('Step 3D: Pharmacy Clinic / Medicine service toggle', () => {
+describe('Step 3D: Pharmacy Clinic / Medicine service toggle (SUPER_ADMIN only)', () => {
     const adminPhone = '5555555651';
     const patientPhone = '5555555652';
     const owner1Phone = '5555557301';
-    const owner2Phone = '5555557302';
     const owner1Email = 'p3d.owner1@test.com';
-    const owner2Email = 'p3d.owner2@test.com';
     const password = 'Password123!';
     const fakeUuid = '00000000-0000-4000-8000-000000000000';
 
@@ -18,7 +16,6 @@ describe('Step 3D: Pharmacy Clinic / Medicine service toggle', () => {
     let patientToken = '';
     let owner1Token = '';
     let ph1Id = '';
-    let ph2Id = '';
 
     const putServices = (id: string, token: string, body: any) =>
         request(app)
@@ -27,10 +24,7 @@ describe('Step 3D: Pharmacy Clinic / Medicine service toggle', () => {
             .send(body);
 
     const cleanup = async () => {
-        const pharmacies = await prisma.pharmacy.findMany({
-            where: { phone: { in: [owner1Phone, owner2Phone] } },
-            select: { id: true },
-        });
+        const pharmacies = await prisma.pharmacy.findMany({ where: { phone: owner1Phone }, select: { id: true } });
         const phIds = pharmacies.map((p) => p.id);
         if (phIds.length > 0) {
             await prisma.auditLog.deleteMany({ where: { entityId: { in: phIds } } });
@@ -38,12 +32,7 @@ describe('Step 3D: Pharmacy Clinic / Medicine service toggle', () => {
             await prisma.pharmacy.deleteMany({ where: { id: { in: phIds } } });
         }
         await prisma.user.deleteMany({
-            where: {
-                OR: [
-                    { phone: { in: [adminPhone, patientPhone, owner1Phone, owner2Phone] } },
-                    { email: { in: [owner1Email, owner2Email] } },
-                ],
-            },
+            where: { OR: [{ phone: { in: [adminPhone, patientPhone, owner1Phone] } }, { email: owner1Email }] },
         });
         await prisma.location.deleteMany({ where: { city: 'Test City3D' } });
     };
@@ -77,20 +66,6 @@ describe('Step 3D: Pharmacy Clinic / Medicine service toggle', () => {
             });
         ph1Id = res1.body.data.id;
         owner1Token = (await request(app).post('/api/v1/auth/login').send({ identifier: owner1Phone, password })).body.data.accessToken;
-
-        const res2 = await request(app)
-            .post('/api/v1/pharmacies/admin-create')
-            .set('Authorization', `Bearer ${adminToken}`)
-            .send({
-                name: 'Test P3D Shop2',
-                ownerName: 'Test 3D Owner2',
-                ownerEmail: owner2Email,
-                ownerPassword: password,
-                phone: owner2Phone,
-                locationId: loc.id,
-                line1: 'Road 2',
-            });
-        ph2Id = res2.body.data.id;
     });
 
     afterAll(async () => {
@@ -103,70 +78,61 @@ describe('Step 3D: Pharmacy Clinic / Medicine service toggle', () => {
         expect(row?.hasClinicService).toBe(false);
     });
 
-    it('2. Owner enables Clinic service (200)', async () => {
-        const res = await putServices(ph1Id, owner1Token, { hasClinicService: true });
+    it('2. Super Admin enables Clinic service (Both) (200)', async () => {
+        const res = await putServices(ph1Id, adminToken, { hasClinicService: true });
         expect(res.status).toBe(200);
         expect(res.body.data.hasClinicService).toBe(true);
         expect(res.body.data.hasMedicineService).toBe(true);
     });
 
-    it('3. Owner disables Medicine service while Clinic is enabled (200)', async () => {
-        const res = await putServices(ph1Id, owner1Token, { hasMedicineService: false });
+    it('3. Super Admin sets Clinic-only (hasMedicineService=false) (200)', async () => {
+        const res = await putServices(ph1Id, adminToken, { hasMedicineService: false });
         expect(res.status).toBe(200);
         expect(res.body.data.hasClinicService).toBe(true);
         expect(res.body.data.hasMedicineService).toBe(false);
     });
 
     it('4. Cannot disable both services at once (400)', async () => {
-        const res = await putServices(ph1Id, owner1Token, { hasClinicService: false, hasMedicineService: false });
+        const res = await putServices(ph1Id, adminToken, { hasClinicService: false, hasMedicineService: false });
         expect(res.status).toBe(400);
     });
 
     it('5. Cannot disable the last remaining active service (400)', async () => {
-        const res = await putServices(ph1Id, owner1Token, { hasClinicService: false });
+        const res = await putServices(ph1Id, adminToken, { hasClinicService: false });
         expect(res.status).toBe(400);
     });
 
-    it('6. Super Admin toggles any pharmacy services (200)', async () => {
-        const res = await putServices(ph2Id, adminToken, { hasClinicService: true, hasMedicineService: true });
-        expect(res.status).toBe(200);
-        expect(res.body.data.hasClinicService).toBe(true);
-        expect(res.body.data.hasMedicineService).toBe(true);
-    });
-
-    it('7. Owner cannot edit another pharmacy services (403)', async () => {
-        const res = await putServices(ph2Id, owner1Token, { hasClinicService: false });
+    it('6. Pharmacy owner CANNOT change own service access (403)', async () => {
+        const res = await putServices(ph1Id, owner1Token, { hasMedicineService: true });
         expect(res.status).toBe(403);
     });
 
-    it('8. Patient cannot update pharmacy services (403)', async () => {
+    it('7. Patient CANNOT update pharmacy services (403)', async () => {
         const res = await putServices(ph1Id, patientToken, { hasMedicineService: true });
         expect(res.status).toBe(403);
     });
 
-    it('9. No token returns 401', async () => {
-        const res = await request(app)
-            .put(`/api/v1/pharmacies/${ph1Id}/services`)
-            .send({ hasClinicService: true });
+    it('8. No token returns 401', async () => {
+        const res = await request(app).put(`/api/v1/pharmacies/${ph1Id}/services`).send({ hasClinicService: true });
         expect(res.status).toBe(401);
     });
 
-    it('10. Empty body returns 400', async () => {
-        const res = await putServices(ph1Id, owner1Token, {});
+    it('9. Empty body returns 400', async () => {
+        const res = await putServices(ph1Id, adminToken, {});
         expect(res.status).toBe(400);
     });
 
-    it('11. Unknown pharmacy returns 404', async () => {
+    it('10. Unknown pharmacy returns 404', async () => {
         const res = await putServices(fakeUuid, adminToken, { hasClinicService: true });
         expect(res.status).toBe(404);
     });
 
-    it('12. Audit log has PHARMACY_SERVICES_UPDATED', async () => {
+    it('11. Audit log has PHARMACY_SERVICES_UPDATED', async () => {
         const log = await prisma.auditLog.findFirst({
             where: { entityId: ph1Id, action: 'PHARMACY_SERVICES_UPDATED' },
             orderBy: { createdAt: 'desc' },
         });
         expect(log).not.toBeNull();
-        expect(log?.after).toBeTruthy();
+        expect(log?.actorRole).toBe('SUPER_ADMIN');
     });
 });
