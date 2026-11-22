@@ -1,0 +1,16 @@
+import { Router } from 'express';
+import { authenticate, authorizeRoles } from '../../middlewares/auth.middleware';
+import { validate } from '../../middlewares/validate.middleware';
+import * as c from './prescription.controller';
+import { createPrescriptionSchema, reviewPrescriptionSchema, pharmacyParamSchema } from './prescription.validation';
+
+const router = Router();
+
+router.use(authenticate);
+
+router.post('/', authorizeRoles('PATIENT'), validate(createPrescriptionSchema), c.submitPrescription);
+router.get('/my', authorizeRoles('PATIENT'), c.getMyPrescriptions);
+router.get('/pharmacy/:pharmacyId', authorizeRoles('SUPER_ADMIN', 'PHARMACY'), validate(pharmacyParamSchema), c.getPharmacyPrescriptions);
+router.patch('/:id/review', authorizeRoles('SUPER_ADMIN', 'PHARMACY'), validate(reviewPrescriptionSchema), c.reviewPrescription);
+
+export default router;

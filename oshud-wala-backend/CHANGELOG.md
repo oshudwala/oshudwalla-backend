@@ -153,3 +153,9 @@ Design-level only: v1 table and role names above are replaced. Nothing was migra
 ### Added
 - `src/modules/category/`, `src/modules/product/`, and `src/modules/cart/` mounted at `/api/v1/categories`, `/api/v1/products`, and `/api/v1/cart`.
 - Automated Jest suite `tests/integration/catalog-cart.test.ts` (8 tests).
+
+## [Step 8] - 2026-11-22
+### Added
+- `src/utils/cloudinary.util.ts` and `src/modules/prescription/` with 48-hour BullMQ auto-deletion of prescription photos.
+- `src/modules/order/` mounted at `/api/v1/orders` with strict state machine, idempotency, and cart clearing.
+- Automated Jest suite `tests/integration/prescription-order.test.ts` (8 tests).

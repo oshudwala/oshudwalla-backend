@@ -89,3 +89,12 @@
 | Cart | PUT | `/api/v1/cart/items/:productId` | Yes | PATIENT | `{"quantity":3}` | Implemented | Passed (8/8) | Yes |
 | Cart | DELETE | `/api/v1/cart/items/:productId` | Yes | PATIENT | *None* | Implemented | Passed (8/8) | Yes |
 | Cart | DELETE | `/api/v1/cart` | Yes | PATIENT | *None* | Implemented | Passed (8/8) | Yes |
+| Prescription | POST | `/api/v1/prescriptions` | Yes | PATIENT | `{"pharmacyId":"uuid (opt)","doctorName":"Dr X","files":[{"storageKey":"cloudinary_public_id","mimeType":"image/jpeg","sizeBytes":12000,"checksumSha256":"..."}]}` | Implemented | Passed (8/8) | Yes |
+| Prescription | GET | `/api/v1/prescriptions/my` | Yes | PATIENT | *None* | Implemented | Passed (8/8) | Yes |
+| Prescription | GET | `/api/v1/prescriptions/pharmacy/:pharmacyId` | Yes | SUPER_ADMIN, PHARMACY (own) | *None* | Implemented | Passed (8/8) | Yes |
+| Prescription | PATCH | `/api/v1/prescriptions/:id/review` | Yes | SUPER_ADMIN, PHARMACY (own) | `{"status":"VERIFIED" \| "REJECTED","rejectionReason":"..."}` | Implemented | Passed (8/8) | Yes |
+| Order | POST | `/api/v1/orders` | Yes | PATIENT | `{"addressId":"uuid","pharmacyId":"uuid (opt)","prescriptionId":"uuid (opt)","idempotencyKey":"key-1"}` | Implemented | Passed (8/8) | Yes |
+| Order | GET | `/api/v1/orders/my` | Yes | PATIENT | *None* | Implemented | Passed (8/8) | Yes |
+| Order | GET | `/api/v1/orders/pharmacy/:pharmacyId` | Yes | SUPER_ADMIN, PHARMACY (own) | *None* | Implemented | Passed (8/8) | Yes |
+| Order | PATCH | `/api/v1/orders/:id/status` | Yes | SUPER_ADMIN, PHARMACY (own) | `{"status":"ACCEPTED" \| "PREPARING" \| "READY_FOR_PICKUP" \| "REJECTED"}` | Implemented | Passed (8/8) | Yes |
+| Order | PATCH | `/api/v1/orders/:id/cancel` | Yes | PATIENT (own), SUPER_ADMIN | `{"cancelReason":"..."}` | Implemented | Passed (8/8) | Yes |

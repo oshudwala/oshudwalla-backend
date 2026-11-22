@@ -44,3 +44,5 @@ Previous "23 passed" claim is NOT verified: `establishment.test.ts` referenced a
 - **Step 6 (2026-11-22)**: Added Appointment booking (with `FOR UPDATE` slot lock, idempotency, auto token numbers), status transitions, cancellation, Live Queue management, switched `auth.middleware.ts` to shared Prisma client, and 8 Jest tests.
 
 - **Step 7 (2026-11-22)**: Added Category, Product Catalog (search + Rx filter), and Patient Cart (auto subtotalPaise + requiresPrescription flag) with 8 Jest tests.
+
+- **Step 8 (2026-11-22)**: Added Prescription submission (only `hasMedicineService=true` pharmacies; 48-hour BullMQ Cloudinary auto-delete) and COD Order lifecycle (`PENDING_PHARMACY_REVIEW -> ACCEPTED -> PREPARING -> READY_FOR_PICKUP`) with 8 Jest tests.
