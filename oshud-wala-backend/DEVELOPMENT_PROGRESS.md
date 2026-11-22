@@ -40,3 +40,5 @@ Previous "23 passed" claim is NOT verified: `establishment.test.ts` referenced a
 - **Step 5 (2026-11-21)**: Added Doctor weekly schedules, LEAVE/MODIFIED_HOURS exceptions, idempotent slot generation (respects pharmacy holidays & leaves), slot OPEN/BLOCKED toggle, and 9 Jest tests.
 
 - **Step 5 (2026-11-21)**: Added Doctor weekly schedules, LEAVE/MODIFIED_HOURS exceptions, idempotent slot generation (respects pharmacy holidays & leaves), slot OPEN/BLOCKED toggle, and 9 Jest tests.
+
+- **Step 6 (2026-11-22)**: Added Appointment booking (with `FOR UPDATE` slot lock, idempotency, auto token numbers), status transitions, cancellation, Live Queue management, switched `auth.middleware.ts` to shared Prisma client, and 8 Jest tests.

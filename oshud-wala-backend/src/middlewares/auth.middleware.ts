@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken } from '../utils/jwt.util';
 import { ApiError } from '../utils/apiError';
-import { PrismaClient, RoleName } from '@prisma/client';
-const prisma = new PrismaClient();
+import { RoleName } from '@prisma/client';
+import { prisma } from '../config/prisma';
 
 export interface AuthRequest extends Request {
     user?: { userId: string; role: string };

@@ -70,3 +70,10 @@
 | Schedule | POST | `/api/v1/schedules/generate-slots` | Yes | SUPER_ADMIN, PHARMACY (own), DOCTOR (own) | `{"pharmacyDoctorId":"uuid","fromDate":"2026-12-07","toDate":"2026-12-08"}` | Implemented | Passed (9/9) | Yes |
 | Schedule | GET | `/api/v1/schedules/slots/:pharmacyDoctorId` | Yes | All | query: `date` or `fromDate, toDate` | Implemented | Passed (9/9) | Yes |
 | Schedule | PATCH | `/api/v1/schedules/slots/:slotId/status` | Yes | SUPER_ADMIN, PHARMACY (own), DOCTOR (own) | `{"status":"BLOCKED"}` | Implemented | Passed (9/9) | Yes |
+| Appointment | POST | `/api/v1/appointments` | Yes | PATIENT | `{"slotId":"uuid","reason":"Fever","idempotencyKey":"key-1"}` | Implemented | Passed (8/8) | Yes |
+| Appointment | GET | `/api/v1/appointments/my` | Yes | PATIENT | *None* | Implemented | Passed (8/8) | Yes |
+| Appointment | GET | `/api/v1/appointments/pharmacy-doctor/:pharmacyDoctorId` | Yes | SUPER_ADMIN, PHARMACY, RECEPTIONIST, DOCTOR | query: `date` | Implemented | Passed (8/8) | Yes |
+| Appointment | PATCH | `/api/v1/appointments/:id/cancel` | Yes | PATIENT (own), SUPER_ADMIN, PHARMACY, RECEPTIONIST | `{"cancelReason":"..."}` | Implemented | Passed (8/8) | Yes |
+| Appointment | PATCH | `/api/v1/appointments/:id/status` | Yes | SUPER_ADMIN, PHARMACY, RECEPTIONIST, DOCTOR | `{"status":"CHECKED_IN" \| "IN_CONSULTATION" \| "COMPLETED" \| "NO_SHOW","doctorNotes":"..."}` | Implemented | Passed (8/8) | Yes |
+| Appointment | GET | `/api/v1/appointments/queue/:pharmacyDoctorId` | Yes | All | query: `date` | Implemented | Passed (8/8) | Yes |
+| Appointment | PATCH | `/api/v1/appointments/queue/:pharmacyDoctorId/status` | Yes | SUPER_ADMIN, PHARMACY, RECEPTIONIST, DOCTOR | `{"queueDate":"2026-12-14","status":"OPEN" \| "PAUSED" \| "CLOSED"}` | Implemented | Passed (8/8) | Yes |

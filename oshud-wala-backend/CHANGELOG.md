@@ -142,3 +142,9 @@ Design-level only: v1 table and role names above are replaced. Nothing was migra
 ### Added
 - `src/modules/schedule/` mounted at `/api/v1/schedules` (weekly schedules, exceptions, automated slot generation up to 31 days, slot status toggle).
 - Automated Jest suite `tests/integration/schedule.test.ts` (9 tests).
+
+## [Step 6] - 2026-11-22
+### Added
+- `src/modules/appointment/` mounted at `/api/v1/appointments` (booking with row-level lock, idempotency, token issuance, status transitions, live queue).
+- Switched `src/middlewares/auth.middleware.ts` to shared `prisma` client.
+- Automated Jest suite `tests/integration/appointment.test.ts` (8 tests).
