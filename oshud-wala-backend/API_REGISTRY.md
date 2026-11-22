@@ -98,3 +98,12 @@
 | Order | GET | `/api/v1/orders/pharmacy/:pharmacyId` | Yes | SUPER_ADMIN, PHARMACY (own) | *None* | Implemented | Passed (8/8) | Yes |
 | Order | PATCH | `/api/v1/orders/:id/status` | Yes | SUPER_ADMIN, PHARMACY (own) | `{"status":"ACCEPTED" \| "PREPARING" \| "READY_FOR_PICKUP" \| "REJECTED"}` | Implemented | Passed (8/8) | Yes |
 | Order | PATCH | `/api/v1/orders/:id/cancel` | Yes | PATIENT (own), SUPER_ADMIN | `{"cancelReason":"..."}` | Implemented | Passed (8/8) | Yes |
+| Rider | POST | `/api/v1/riders/admin-create` | Yes | SUPER_ADMIN | `{"fullName":"Rider","phone":"9876543210","email":"r@x.com","password":"min8chars","vehicleType":"Bike","vehicleNumber":"WB39A1234"}` | Implemented | Passed (7/7) | Yes |
+| Rider | GET | `/api/v1/riders` | Yes | SUPER_ADMIN | *None* | Implemented | Passed (7/7) | Yes |
+| Rider | PATCH | `/api/v1/riders/:userId/status` | Yes | SUPER_ADMIN | `{"status":"AVAILABLE","kycStatus":"APPROVED"}` | Implemented | Passed (7/7) | Yes |
+| Delivery | POST | `/api/v1/deliveries/assign` | Yes | SUPER_ADMIN | `{"riderId":"uuid","orderIds":["uuid"]}` | Implemented | Passed (7/7) | Yes |
+| Delivery | GET | `/api/v1/deliveries/my` | Yes | RIDER | *None* | Implemented | Passed (7/7) | Yes |
+| Delivery | POST | `/api/v1/deliveries/pickup-qr/scan` | Yes | RIDER | `{"qrToken":"QR-..."}` | Implemented | Passed (7/7) | Yes |
+| Delivery | POST | `/api/v1/deliveries/:deliveryId/arrived` | Yes | RIDER | *None* | Implemented | Passed (7/7) | Yes |
+| Delivery | GET | `/api/v1/deliveries/order/:orderId/otp` | Yes | PATIENT (own) | *None* | Implemented | Passed (7/7) | Yes |
+| Delivery | POST | `/api/v1/deliveries/:deliveryId/complete` | Yes | RIDER | `{"otp":"123456"}` | Implemented | Passed (7/7) | Yes |

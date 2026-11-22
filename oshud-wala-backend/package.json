@@ -27,7 +27,8 @@
     "test:schedule": "jest tests/integration/schedule.test.ts --forceExit",
     "test:appointment": "jest tests/integration/appointment.test.ts --forceExit",
     "test:catalog-cart": "jest tests/integration/catalog-cart.test.ts --forceExit",
-    "test:prescription-order": "jest tests/integration/prescription-order.test.ts --forceExit"
+    "test:prescription-order": "jest tests/integration/prescription-order.test.ts --forceExit",
+    "test:rider-delivery": "jest tests/integration/rider-delivery.test.ts --forceExit"
   },
   "author": "SCTECNOIT",
   "license": "ISC",

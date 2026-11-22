@@ -159,3 +159,9 @@ Design-level only: v1 table and role names above are replaced. Nothing was migra
 - `src/utils/cloudinary.util.ts` and `src/modules/prescription/` with 48-hour BullMQ auto-deletion of prescription photos.
 - `src/modules/order/` mounted at `/api/v1/orders` with strict state machine, idempotency, and cart clearing.
 - Automated Jest suite `tests/integration/prescription-order.test.ts` (8 tests).
+
+## [Step 9] - 2026-11-22
+### Added
+- `src/modules/rider/` (`/api/v1/riders`) for Super Admin rider onboarding & status control.
+- `src/modules/delivery/` (`/api/v1/deliveries`) for bulk assignment, single-use Pickup QR, In-App Delivery OTP, COD CashCollection, and ₹40 rider earning ledger credit.
+- Automated Jest suite `tests/integration/rider-delivery.test.ts` (7 tests).
