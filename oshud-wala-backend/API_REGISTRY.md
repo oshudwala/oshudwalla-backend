@@ -77,3 +77,15 @@
 | Appointment | PATCH | `/api/v1/appointments/:id/status` | Yes | SUPER_ADMIN, PHARMACY, RECEPTIONIST, DOCTOR | `{"status":"CHECKED_IN" \| "IN_CONSULTATION" \| "COMPLETED" \| "NO_SHOW","doctorNotes":"..."}` | Implemented | Passed (8/8) | Yes |
 | Appointment | GET | `/api/v1/appointments/queue/:pharmacyDoctorId` | Yes | All | query: `date` | Implemented | Passed (8/8) | Yes |
 | Appointment | PATCH | `/api/v1/appointments/queue/:pharmacyDoctorId/status` | Yes | SUPER_ADMIN, PHARMACY, RECEPTIONIST, DOCTOR | `{"queueDate":"2026-12-14","status":"OPEN" \| "PAUSED" \| "CLOSED"}` | Implemented | Passed (8/8) | Yes |
+| Category | GET | `/api/v1/categories` | No | Public | query: `parentId` | Implemented | Passed (8/8) | Yes |
+| Category | POST | `/api/v1/categories` | Yes | SUPER_ADMIN | `{"name":"Pain Relief","slug":"pain-relief","sortOrder":1}` | Implemented | Passed (8/8) | Yes |
+| Category | PUT | `/api/v1/categories/:id` | Yes | SUPER_ADMIN | `{"name":"Updated","isActive":true}` | Implemented | Passed (8/8) | Yes |
+| Product | GET | `/api/v1/products` | No | Public | query: `q, categoryId, requiresPrescription, page, limit` | Implemented | Passed (8/8) | Yes |
+| Product | GET | `/api/v1/products/:id` | No | Public | *None* | Implemented | Passed (8/8) | Yes |
+| Product | POST | `/api/v1/products` | Yes | SUPER_ADMIN | `{"name":"Paracetamol 500mg","categoryId":"uuid","mrpPaise":3000,"requiresPrescription":false}` | Implemented | Passed (8/8) | Yes |
+| Product | PUT | `/api/v1/products/:id` | Yes | SUPER_ADMIN | `{"mrpPaise":3200}` | Implemented | Passed (8/8) | Yes |
+| Cart | GET | `/api/v1/cart` | Yes | PATIENT | *None* | Implemented | Passed (8/8) | Yes |
+| Cart | POST | `/api/v1/cart/items` | Yes | PATIENT | `{"productId":"uuid","quantity":2}` | Implemented | Passed (8/8) | Yes |
+| Cart | PUT | `/api/v1/cart/items/:productId` | Yes | PATIENT | `{"quantity":3}` | Implemented | Passed (8/8) | Yes |
+| Cart | DELETE | `/api/v1/cart/items/:productId` | Yes | PATIENT | *None* | Implemented | Passed (8/8) | Yes |
+| Cart | DELETE | `/api/v1/cart` | Yes | PATIENT | *None* | Implemented | Passed (8/8) | Yes |

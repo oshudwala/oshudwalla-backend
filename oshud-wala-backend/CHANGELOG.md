@@ -148,3 +148,8 @@ Design-level only: v1 table and role names above are replaced. Nothing was migra
 - `src/modules/appointment/` mounted at `/api/v1/appointments` (booking with row-level lock, idempotency, token issuance, status transitions, live queue).
 - Switched `src/middlewares/auth.middleware.ts` to shared `prisma` client.
 - Automated Jest suite `tests/integration/appointment.test.ts` (8 tests).
+
+## [Step 7] - 2026-11-22
+### Added
+- `src/modules/category/`, `src/modules/product/`, and `src/modules/cart/` mounted at `/api/v1/categories`, `/api/v1/products`, and `/api/v1/cart`.
+- Automated Jest suite `tests/integration/catalog-cart.test.ts` (8 tests).
