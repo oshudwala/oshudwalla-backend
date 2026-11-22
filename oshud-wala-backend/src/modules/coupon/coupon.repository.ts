@@ -37,3 +37,12 @@ export const updateCouponStatusTx = (id: string, before: any, isActive: boolean,
         });
         return updated;
     });
+
+export const updateCouponTx = (id: string, before: any, data: any, actor: Actor) =>
+    prisma.$transaction(async (tx) => {
+        const updated = await tx.coupon.update({ where: { id }, data });
+        await tx.auditLog.create({
+            data: { actorId: actor.id, actorRole: actor.role, action: 'COUPON_UPDATED', entityType: 'Coupon', entityId: id, before: before as any, after: updated as any },
+        });
+        return updated;
+    });

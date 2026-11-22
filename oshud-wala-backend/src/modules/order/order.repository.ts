@@ -16,6 +16,7 @@ export const placeOrderFromCartTx = (
     addressId: string,
     pharmacyId: string | null,
     prescriptionId: string | null,
+    couponCode: string | null,
     idempotencyKey: string | null,
     actor: Actor
 ) =>
@@ -85,8 +86,47 @@ export const placeOrderFromCartTx = (
                 };
             });
 
+            // Optional Coupon validation & redemption
+            let couponId: string | null = null;
+            let discountPaise = 0;
+
+            if (couponCode) {
+                const coupon = await tx.coupon.findUnique({ where: { code: couponCode } });
+                if (!coupon || !coupon.isActive) throw new ApiError(404, 'Invalid or inactive coupon');
+
+                const now = new Date();
+                if (now < coupon.validFrom || now > coupon.validTo) {
+                    throw new ApiError(400, 'Coupon is expired or not yet active');
+                }
+                if (subtotalPaise < coupon.minOrderPaise) {
+                    throw new ApiError(400, `Minimum order amount is ${coupon.minOrderPaise} paise`);
+                }
+                if (coupon.usageLimitTotal !== null && coupon.usedCount >= coupon.usageLimitTotal) {
+                    throw new ApiError(400, 'Coupon usage limit reached');
+                }
+
+                const perUserLimit = coupon.usageLimitPerUser ?? 1;
+                const userUsedCount = await tx.couponRedemption.count({
+                    where: { couponId: coupon.id, userId: patientId },
+                });
+                if (userUsedCount >= perUserLimit) {
+                    throw new ApiError(400, `You have already used this coupon ${perUserLimit} time(s)`);
+                }
+
+                discountPaise =
+                    coupon.discountType === 'PERCENT'
+                        ? Math.floor((subtotalPaise * coupon.discountValue) / 100)
+                        : coupon.discountValue;
+
+                if (coupon.maxDiscountPaise !== null && discountPaise > coupon.maxDiscountPaise) {
+                    discountPaise = coupon.maxDiscountPaise;
+                }
+                if (discountPaise > subtotalPaise) discountPaise = subtotalPaise;
+                couponId = coupon.id;
+            }
+
             const deliveryFeePaise = 0;
-            const totalPaise = subtotalPaise + deliveryFeePaise;
+            const totalPaise = Math.max(0, subtotalPaise - discountPaise + deliveryFeePaise);
             const orderNumber = `ORD-${Date.now()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
 
             const order = await tx.order.create({
@@ -95,6 +135,7 @@ export const placeOrderFromCartTx = (
                     patientId,
                     pharmacyId: targetPharmacyId,
                     prescriptionId: prescriptionId ?? null,
+                    couponId,
                     addressId: address.id,
                     deliveryAddress: {
                         fullName: address.fullName,
@@ -110,6 +151,7 @@ export const placeOrderFromCartTx = (
                     paymentMethod: 'COD',
                     paymentStatus: 'PENDING',
                     subtotalPaise,
+                    discountPaise,
                     deliveryFeePaise,
                     totalPaise,
                     idempotencyKey,
@@ -126,7 +168,16 @@ export const placeOrderFromCartTx = (
                 include: { items: true },
             });
 
-            // Clear cart after successful order placement
+            if (couponId) {
+                await tx.couponRedemption.create({
+                    data: { couponId, userId: patientId, orderId: order.id, discountPaise },
+                });
+                await tx.coupon.update({
+                    where: { id: couponId },
+                    data: { usedCount: { increment: 1 } },
+                });
+            }
+
             await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
 
             await tx.auditLog.create({
@@ -136,7 +187,7 @@ export const placeOrderFromCartTx = (
                     action: 'ORDER_PLACED',
                     entityType: 'Order',
                     entityId: order.id,
-                    after: { orderNumber: order.orderNumber, totalPaise, pharmacyId: targetPharmacyId } as any,
+                    after: { orderNumber: order.orderNumber, totalPaise, discountPaise, couponId, pharmacyId: targetPharmacyId } as any,
                 },
             });
 

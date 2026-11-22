@@ -16,6 +16,7 @@ export const placeOrder = async (body: any, actor: Actor) => {
         body.addressId,
         body.pharmacyId ?? null,
         body.prescriptionId ?? null,
+        body.couponCode ? String(body.couponCode).trim().toUpperCase() : null,
         body.idempotencyKey ? String(body.idempotencyKey).trim() : null,
         actor
     );

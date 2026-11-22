@@ -26,3 +26,8 @@ export const updateCouponStatus = asyncHandler(async (req: AuthRequest, res: Res
     const data = await service.setCouponStatus(req.params.id, req.body.isActive, actorOf(req));
     res.status(200).json(new ApiResponse(200, data, 'Coupon status updated'));
 });
+
+export const updateCoupon = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const data = await service.updateCoupon(req.params.id, req.body, actorOf(req));
+    res.status(200).json(new ApiResponse(200, data, 'Coupon updated'));
+});

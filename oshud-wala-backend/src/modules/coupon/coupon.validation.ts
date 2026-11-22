@@ -11,7 +11,7 @@ export const createCouponSchema = z.object({
         validFrom: z.string().datetime(),
         validTo: z.string().datetime(),
         usageLimitTotal: z.number().int().min(1).optional().nullable(),
-        usageLimitPerUser: z.number().int().min(1).optional().nullable(),
+        usageLimitPerUser: z.number().int().min(1).default(1),
         isActive: z.boolean().default(true),
     }).refine((d) => new Date(d.validFrom) < new Date(d.validTo), {
         message: 'validFrom must be before validTo',
@@ -32,4 +32,17 @@ export const validateCouponSchema = z.object({
 export const updateCouponStatusSchema = z.object({
     params: z.object({ id: z.string().uuid('Invalid coupon id') }),
     body: z.object({ isActive: z.boolean() }),
+});
+
+export const updateCouponSchema = z.object({
+    params: z.object({ id: z.string().uuid('Invalid coupon id') }),
+    body: z.object({
+        description: z.string().trim().max(300).optional().nullable(),
+        maxDiscountPaise: z.number().int().min(1).optional().nullable(),
+        minOrderPaise: z.number().int().min(0).optional(),
+        validTo: z.string().datetime().optional(),
+        usageLimitTotal: z.number().int().min(1).optional().nullable(),
+        usageLimitPerUser: z.number().int().min(1).optional(),
+        isActive: z.boolean().optional(),
+    }).refine((d) => Object.keys(d).length > 0, { message: 'At least one field is required' }),
 });

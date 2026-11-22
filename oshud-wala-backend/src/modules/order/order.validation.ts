@@ -5,6 +5,7 @@ export const createOrderSchema = z.object({
         addressId: z.string().uuid('Valid addressId is required'),
         pharmacyId: z.string().uuid().optional().nullable(),
         prescriptionId: z.string().uuid().optional().nullable(),
+        couponCode: z.string().trim().min(2).max(40).optional().nullable(),
         idempotencyKey: z.string().trim().min(4).max(100).optional().nullable(),
     }),
 });

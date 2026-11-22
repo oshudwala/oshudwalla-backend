@@ -18,7 +18,7 @@ export const createCoupon = async (body: any, actor: Actor) => {
                 validFrom: new Date(body.validFrom),
                 validTo: new Date(body.validTo),
                 usageLimitTotal: body.usageLimitTotal ?? null,
-                usageLimitPerUser: body.usageLimitPerUser ?? null,
+                usageLimitPerUser: body.usageLimitPerUser ?? 1,
                 isActive: body.isActive ?? true,
             },
             actor
@@ -77,4 +77,18 @@ export const setCouponStatus = async (id: string, isActive: boolean, actor: Acto
     const existing = await repo.findCouponById(id);
     if (!existing) throw new ApiError(404, 'Coupon not found');
     return await repo.updateCouponStatusTx(id, existing, isActive, actor);
+};
+
+export const updateCoupon = async (id: string, body: any, actor: Actor) => {
+    const existing = await repo.findCouponById(id);
+    if (!existing) throw new ApiError(404, 'Coupon not found');
+    const data: any = {};
+    if (body.description !== undefined) data.description = body.description ? String(body.description).trim() : null;
+    if (body.maxDiscountPaise !== undefined) data.maxDiscountPaise = body.maxDiscountPaise;
+    if (body.minOrderPaise !== undefined) data.minOrderPaise = body.minOrderPaise;
+    if (body.validTo !== undefined) data.validTo = new Date(body.validTo);
+    if (body.usageLimitTotal !== undefined) data.usageLimitTotal = body.usageLimitTotal;
+    if (body.usageLimitPerUser !== undefined) data.usageLimitPerUser = body.usageLimitPerUser;
+    if (body.isActive !== undefined) data.isActive = body.isActive;
+    return await repo.updateCouponTx(id, existing, data, actor);
 };
