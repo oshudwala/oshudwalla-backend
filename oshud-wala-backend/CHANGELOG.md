@@ -171,3 +171,8 @@ Design-level only: v1 table and role names above are replaced. Nothing was migra
 - `src/modules/wallet/` (`/api/v1/wallet`) for wallet balance, ledger entries, row-locked withdrawal requests, and admin payout/rejection settlements.
 - `src/modules/cashCollection/` (`/api/v1/cash`) for rider COD cash tracking, deposit submission, and admin verification.
 - Automated Jest suite `tests/integration/wallet-cash.test.ts` (6 tests).
+
+## [Step 11] - 2026-11-22
+### Added
+- `src/modules/coupon/` (`/api/v1/coupons`), `src/modules/referral/` (`/api/v1/referrals`), and `src/modules/support/` (`/api/v1/support`).
+- Automated Jest suite `tests/integration/step11-extras.test.ts` (6 tests).

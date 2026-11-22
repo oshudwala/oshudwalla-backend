@@ -114,3 +114,15 @@
 | Cash | GET | `/api/v1/cash/my` | Yes | RIDER | *None* | Implemented | Passed (6/6) | Yes |
 | Cash | POST | `/api/v1/cash/deposits` | Yes | RIDER | `{"collectionIds":["uuid"],"method":"UPI","referenceNo":"COD-UTR-999"}` | Implemented | Passed (6/6) | Yes |
 | Cash | PATCH | `/api/v1/cash/deposits/:id/verify` | Yes | SUPER_ADMIN | `{"decision":"VERIFIED" \| "REJECTED","rejectionReason":"..."}` | Implemented | Passed (6/6) | Yes |
+| Coupon | GET | `/api/v1/coupons` | Yes | All (active only for non-admin) | *None* | Implemented | Passed (6/6) | Yes |
+| Coupon | POST | `/api/v1/coupons` | Yes | SUPER_ADMIN | `{"code":"OSHUD20","discountType":"PERCENT","discountValue":20,"maxDiscountPaise":5000,"minOrderPaise":10000,"validFrom":"2026-11-22T00:00:00Z","validTo":"2026-12-31T23:59:59Z"}` | Implemented | Passed (6/6) | Yes |
+| Coupon | POST | `/api/v1/coupons/validate` | Yes | PATIENT | `{"code":"OSHUD20","subtotalPaise":50000}` | Implemented | Passed (6/6) | Yes |
+| Coupon | PATCH | `/api/v1/coupons/:id/status` | Yes | SUPER_ADMIN | `{"isActive":false}` | Implemented | Passed (6/6) | Yes |
+| Referral | GET | `/api/v1/referrals/my` | Yes | PATIENT | *None* | Implemented | Passed (6/6) | Yes |
+| Referral | POST | `/api/v1/referrals/apply` | Yes | PATIENT | `{"referrerId":"uuid"}` | Implemented | Passed (6/6) | Yes |
+| Referral | POST | `/api/v1/referrals/:id/reward` | Yes | SUPER_ADMIN | `{"rewardCoins":50}` | Implemented | Passed (6/6) | Yes |
+| Support | POST | `/api/v1/support/tickets` | Yes | All | `{"subject":"Late delivery","message":"Where is my order?","priority":"HIGH"}` | Implemented | Passed (6/6) | Yes |
+| Support | GET | `/api/v1/support/tickets` | Yes | All (own; all for SUPER_ADMIN) | *None* | Implemented | Passed (6/6) | Yes |
+| Support | GET | `/api/v1/support/tickets/:id` | Yes | Owner, SUPER_ADMIN | *None* | Implemented | Passed (6/6) | Yes |
+| Support | POST | `/api/v1/support/tickets/:id/messages` | Yes | Owner, SUPER_ADMIN | `{"body":"We are checking now."}` | Implemented | Passed (6/6) | Yes |
+| Support | PATCH | `/api/v1/support/tickets/:id/status` | Yes | SUPER_ADMIN | `{"status":"RESOLVED","priority":"HIGH"}` | Implemented | Passed (6/6) | Yes |

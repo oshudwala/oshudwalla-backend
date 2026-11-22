@@ -50,3 +50,5 @@ Previous "23 passed" claim is NOT verified: `establishment.test.ts` referenced a
 - **Step 9 (2026-11-22)**: Added Super Admin Rider creation (User + RiderProfile + Wallet), bulk order assignment, single-use Pickup QR, AES-GCM In-App Delivery OTP (customer-only), ₹40 immutable ledger rider earning, COD CashCollection tracking, and 7 Jest tests.
 
 - **Step 10 (2026-11-22)**: Added Wallet & Ledger withdrawal holds/payouts/releases (row-locked), COD CashCollection deposit submission & Super Admin verification with Settlement records, and 6 Jest tests.
+
+- **Step 11 (2026-11-22)**: Added Coupons (PERCENT/FLAT with caps & limits), Referral & CoinAccount rewards, and Support Tickets with threaded messages and 6 Jest tests. **Full Backend (Steps 1–11) Complete.**

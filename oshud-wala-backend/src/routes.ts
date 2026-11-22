@@ -18,6 +18,9 @@ import riderRoutes from './modules/rider/rider.routes';
 import deliveryRoutes from './modules/delivery/delivery.routes';
 import walletRoutes from './modules/wallet/wallet.routes';
 import cashCollectionRoutes from './modules/cashCollection/cashCollection.routes';
+import couponRoutes from './modules/coupon/coupon.routes';
+import referralRoutes from './modules/referral/referral.routes';
+import supportRoutes from './modules/support/support.routes';
 
 const router = Router();
 
@@ -40,5 +43,8 @@ router.use('/riders', riderRoutes);
 router.use('/deliveries', deliveryRoutes);
 router.use('/wallet', walletRoutes);
 router.use('/cash', cashCollectionRoutes);
+router.use('/coupons', couponRoutes);
+router.use('/referrals', referralRoutes);
+router.use('/support', supportRoutes);
 
 export default router;
