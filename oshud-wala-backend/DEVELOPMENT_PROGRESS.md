@@ -48,3 +48,5 @@ Previous "23 passed" claim is NOT verified: `establishment.test.ts` referenced a
 - **Step 8 (2026-11-22)**: Added Prescription submission (only `hasMedicineService=true` pharmacies; 48-hour BullMQ Cloudinary auto-delete) and COD Order lifecycle (`PENDING_PHARMACY_REVIEW -> ACCEPTED -> PREPARING -> READY_FOR_PICKUP`) with 8 Jest tests.
 
 - **Step 9 (2026-11-22)**: Added Super Admin Rider creation (User + RiderProfile + Wallet), bulk order assignment, single-use Pickup QR, AES-GCM In-App Delivery OTP (customer-only), ₹40 immutable ledger rider earning, COD CashCollection tracking, and 7 Jest tests.
+
+- **Step 10 (2026-11-22)**: Added Wallet & Ledger withdrawal holds/payouts/releases (row-locked), COD CashCollection deposit submission & Super Admin verification with Settlement records, and 6 Jest tests.

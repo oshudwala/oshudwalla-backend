@@ -107,3 +107,10 @@
 | Delivery | POST | `/api/v1/deliveries/:deliveryId/arrived` | Yes | RIDER | *None* | Implemented | Passed (7/7) | Yes |
 | Delivery | GET | `/api/v1/deliveries/order/:orderId/otp` | Yes | PATIENT (own) | *None* | Implemented | Passed (7/7) | Yes |
 | Delivery | POST | `/api/v1/deliveries/:deliveryId/complete` | Yes | RIDER | `{"otp":"123456"}` | Implemented | Passed (7/7) | Yes |
+| Wallet | GET | `/api/v1/wallet/my` | Yes | RIDER, PATIENT, PHARMACY | *None* | Implemented | Passed (6/6) | Yes |
+| Wallet | POST | `/api/v1/wallet/withdrawals` | Yes | RIDER, PATIENT, PHARMACY | `{"amountPaise":4000,"payoutDetails":{"method":"UPI","upiId":"rider@upi"},"idempotencyKey":"wd-1"}` | Implemented | Passed (6/6) | Yes |
+| Wallet | GET | `/api/v1/wallet/withdrawals` | Yes | SUPER_ADMIN, RIDER, PATIENT, PHARMACY | *None* | Implemented | Passed (6/6) | Yes |
+| Wallet | PATCH | `/api/v1/wallet/withdrawals/:id/review` | Yes | SUPER_ADMIN | `{"decision":"PAID" \| "REJECTED","method":"UPI","referenceNo":"UTR123","rejectionReason":"..."}` | Implemented | Passed (6/6) | Yes |
+| Cash | GET | `/api/v1/cash/my` | Yes | RIDER | *None* | Implemented | Passed (6/6) | Yes |
+| Cash | POST | `/api/v1/cash/deposits` | Yes | RIDER | `{"collectionIds":["uuid"],"method":"UPI","referenceNo":"COD-UTR-999"}` | Implemented | Passed (6/6) | Yes |
+| Cash | PATCH | `/api/v1/cash/deposits/:id/verify` | Yes | SUPER_ADMIN | `{"decision":"VERIFIED" \| "REJECTED","rejectionReason":"..."}` | Implemented | Passed (6/6) | Yes |

@@ -165,3 +165,9 @@ Design-level only: v1 table and role names above are replaced. Nothing was migra
 - `src/modules/rider/` (`/api/v1/riders`) for Super Admin rider onboarding & status control.
 - `src/modules/delivery/` (`/api/v1/deliveries`) for bulk assignment, single-use Pickup QR, In-App Delivery OTP, COD CashCollection, and ₹40 rider earning ledger credit.
 - Automated Jest suite `tests/integration/rider-delivery.test.ts` (7 tests).
+
+## [Step 10] - 2026-11-22
+### Added
+- `src/modules/wallet/` (`/api/v1/wallet`) for wallet balance, ledger entries, row-locked withdrawal requests, and admin payout/rejection settlements.
+- `src/modules/cashCollection/` (`/api/v1/cash`) for rider COD cash tracking, deposit submission, and admin verification.
+- Automated Jest suite `tests/integration/wallet-cash.test.ts` (6 tests).

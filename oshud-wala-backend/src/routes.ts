@@ -16,6 +16,8 @@ import prescriptionRoutes from './modules/prescription/prescription.routes';
 import orderRoutes from './modules/order/order.routes';
 import riderRoutes from './modules/rider/rider.routes';
 import deliveryRoutes from './modules/delivery/delivery.routes';
+import walletRoutes from './modules/wallet/wallet.routes';
+import cashCollectionRoutes from './modules/cashCollection/cashCollection.routes';
 
 const router = Router();
 
@@ -36,5 +38,7 @@ router.use('/prescriptions', prescriptionRoutes);
 router.use('/orders', orderRoutes);
 router.use('/riders', riderRoutes);
 router.use('/deliveries', deliveryRoutes);
+router.use('/wallet', walletRoutes);
+router.use('/cash', cashCollectionRoutes);
 
 export default router;
