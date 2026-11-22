@@ -1557,3 +1557,23 @@ model PharmacyHoliday {
   @@index([pharmacyId, holidayDate])
   @@map("pharmacy_holidays")
 }
+
+model Promotion {
+  id          String    @id @default(uuid()) @db.Uuid
+  heading     String
+  paragraph   String?
+  imageUrl    String
+  buttonText  String?
+  buttonLink  String?
+  couponCode  String?
+  placement   String    @default("HOME_TOP")
+  sortOrder   Int       @default(0)
+  isActive    Boolean   @default(true)
+  validFrom   DateTime?
+  validTo     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([isActive, placement, sortOrder])
+  @@map("promotions")
+}

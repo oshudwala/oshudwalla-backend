@@ -21,6 +21,7 @@ import cashCollectionRoutes from './modules/cashCollection/cashCollection.routes
 import couponRoutes from './modules/coupon/coupon.routes';
 import referralRoutes from './modules/referral/referral.routes';
 import supportRoutes from './modules/support/support.routes';
+import promotionRoutes from './modules/promotion/promotion.routes';
 
 const router = Router();
 
@@ -46,5 +47,6 @@ router.use('/cash', cashCollectionRoutes);
 router.use('/coupons', couponRoutes);
 router.use('/referrals', referralRoutes);
 router.use('/support', supportRoutes);
+router.use('/promotions', promotionRoutes);
 
 export default router;

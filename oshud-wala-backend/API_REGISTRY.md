@@ -126,3 +126,8 @@
 | Support | GET | `/api/v1/support/tickets/:id` | Yes | Owner, SUPER_ADMIN | *None* | Implemented | Passed (6/6) | Yes |
 | Support | POST | `/api/v1/support/tickets/:id/messages` | Yes | Owner, SUPER_ADMIN | `{"body":"We are checking now."}` | Implemented | Passed (6/6) | Yes |
 | Support | PATCH | `/api/v1/support/tickets/:id/status` | Yes | SUPER_ADMIN | `{"status":"RESOLVED","priority":"HIGH"}` | Implemented | Passed (6/6) | Yes |
+| Promotion | GET | `/api/v1/promotions` | No | Public | query: `placement` (e.g. `HOME_TOP`) | Implemented | Verified | Yes |
+| Promotion | GET | `/api/v1/promotions/admin` | Yes | SUPER_ADMIN | *None* | Implemented | Verified | Yes |
+| Promotion | POST | `/api/v1/promotions` | Yes | SUPER_ADMIN | `{"heading":"Flat 20% Off","paragraph":"Use OSHUD20 on orders above ₹100","imageUrl":"https://...","buttonText":"Apply Coupon","buttonLink":"/medicines","couponCode":"OSHUD20","placement":"HOME_TOP","sortOrder":0}` | Implemented | Verified | Yes |
+| Promotion | PUT | `/api/v1/promotions/:id` | Yes | SUPER_ADMIN | `{"sortOrder":1,"isActive":false}` | Implemented | Verified | Yes |
+| Promotion | DELETE | `/api/v1/promotions/:id` | Yes | SUPER_ADMIN | *None* | Implemented | Verified | Yes |
