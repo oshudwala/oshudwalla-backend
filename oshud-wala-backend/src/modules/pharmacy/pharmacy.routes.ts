@@ -12,7 +12,7 @@ router.use(authenticate);
 router.get('/', getPharmacies);
 
 // PHARMACY owner: only the pharmacies linked to me (declared before any '/:id' route)
-router.get('/my', authorizeRoles('PHARMACY'), getMyPharmacies);
+router.get('/my', authorizeRoles('PHARMACY', 'RECEPTIONIST'), getMyPharmacies);
 
 // SUPER_ADMIN ONLY ROUTES
 router.post('/admin-create', authorizeRoles('SUPER_ADMIN'), validate(createPharmacySchema), createNewPharmacy);

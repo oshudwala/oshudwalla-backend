@@ -34,7 +34,7 @@
 | Specialization | GET | `/api/v1/specializations` | Yes | All | *None* | Implemented | Passed | Yes |
 | Specialization | POST | `/api/v1/specializations` | Yes | SUPER_ADMIN | `{"name":"Cardiology","description":"Heart specialist"}` | Implemented | Passed | Yes |
 | Pharmacy | GET | `/api/v1/pharmacies` | Yes | All | *None* | Implemented | Passed | Yes |
-| Pharmacy | GET | `/api/v1/pharmacies/my` | Yes | PHARMACY | *None* | Implemented | Passed | Yes |
+| Pharmacy | GET | `/api/v1/pharmacies/my` | Yes | PHARMACY, RECEPTIONIST | *None* | Implemented | Passed | Yes |
 | Pharmacy | POST | `/api/v1/pharmacies/admin-create` | Yes | SUPER_ADMIN | `{"name":"Shop","nameBn":"optional","nameHi":"optional","ownerName":"Owner","ownerEmail":"owner@x.com","ownerPassword":"min8chars","phone":"9876500001","locationId":"uuid","line1":"Main Road","latitude":23.5,"longitude":87.3}` | Implemented | Passed (19/19) | Yes |
 | Pharmacy | PUT | `/api/v1/pharmacies/admin-primary/:id` | Yes | SUPER_ADMIN | *None* | Implemented | Passed | Yes |
 | Pharmacy | PUT | `/api/v1/pharmacies/admin-update/:id` | Yes | SUPER_ADMIN | `{"locationId": "uuid", "status": "ACTIVE" \| "SUSPENDED"}` | Implemented | Passed (15/15) | Yes |
