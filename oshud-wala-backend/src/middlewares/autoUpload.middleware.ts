@@ -74,3 +74,51 @@ export const autoUpload = (options: AutoUploadOptions) => {
         });
     };
 };
+
+export const autoUploadPrescriptionFiles = () => {
+    const multerMiddleware = upload.fields([
+        { name: 'files', maxCount: 5 },
+        { name: 'file', maxCount: 5 },
+        { name: 'photo', maxCount: 5 },
+    ]);
+
+    return (req: Request, res: Response, next: NextFunction) => {
+        if (!req.is('multipart/form-data')) {
+            return next();
+        }
+
+        multerMiddleware(req, res, async (err: any) => {
+            if (err) return next(err);
+
+            try {
+                const filesObj = req.files as Record<string, Express.Multer.File[]> | undefined;
+                const incomingFiles = [
+                    ...(filesObj?.files || []),
+                    ...(filesObj?.file || []),
+                    ...(filesObj?.photo || []),
+                ];
+
+                if (incomingFiles.length > 0) {
+                    const uploadedFiles = await Promise.all(
+                        incomingFiles.map((f) =>
+                            uploadBufferToCloudinary(f, { folder: 'prescriptions' })
+                        )
+                    );
+
+                    req.body.files = uploadedFiles.map((u) => ({
+                        storageKey: u.storageKey,
+                        mimeType: u.mimeType,
+                        sizeBytes: u.sizeBytes,
+                        checksumSha256: u.checksumSha256,
+                    }));
+                } else if (typeof req.body?.files === 'string') {
+                    try { req.body.files = JSON.parse(req.body.files); } catch {}
+                }
+
+                next();
+            } catch (uploadErr) {
+                next(uploadErr);
+            }
+        });
+    };
+};
