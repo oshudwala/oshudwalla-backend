@@ -10,6 +10,7 @@ import {
     updateAssignmentStatus,
 } from './doctor.controller';
 import { validate } from '../../middlewares/validate.middleware';
+import { autoUpload } from '../../middlewares/autoUpload.middleware';
 import {
     addDoctorSchema,
     createGlobalDoctorSchema,

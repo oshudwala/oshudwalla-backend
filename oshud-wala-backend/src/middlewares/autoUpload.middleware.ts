@@ -1,0 +1,76 @@
+import { Request, Response, NextFunction } from 'express';
+import multer from 'multer';
+import { ApiError } from '../utils/apiError';
+import { uploadBufferToCloudinary } from '../modules/upload/upload.service';
+
+const ALLOWED_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
+
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+        if (!ALLOWED_MIMES.has(file.mimetype)) {
+            return cb(new ApiError(400, 'Only JPG, PNG, WEBP, and PDF files are allowed'));
+        }
+        cb(null, true);
+    },
+});
+
+interface AutoUploadOptions {
+    folder: string;
+    targetBodyKey: string;
+    nameFromBody?: string;
+}
+
+export const autoUpload = (options: AutoUploadOptions) => {
+    const multerMiddleware = upload.fields([
+        { name: 'photo', maxCount: 1 },
+        { name: 'image', maxCount: 1 },
+        { name: 'file', maxCount: 1 },
+    ]);
+
+    return (req: Request, res: Response, next: NextFunction) => {
+        if (!req.is('multipart/form-data')) {
+            return next();
+        }
+
+        multerMiddleware(req, res, async (err: any) => {
+            if (err) return next(err);
+
+            try {
+                if (req.body && typeof req.body === 'object') {
+                    for (const key of Object.keys(req.body)) {
+                        const val = req.body[key];
+                        if (typeof val === 'string') {
+                            if (val === 'true') req.body[key] = true;
+                            else if (val === 'false') req.body[key] = false;
+                            else if ((val.startsWith('[') && val.endsWith(']')) || (val.startsWith('{') && val.endsWith('}'))) {
+                                try { req.body[key] = JSON.parse(val); } catch {}
+                            }
+                        }
+                    }
+                }
+
+                const filesObj = req.files as Record<string, Express.Multer.File[]> | undefined;
+                const file = filesObj?.photo?.[0] || filesObj?.image?.[0] || filesObj?.file?.[0];
+
+                if (file) {
+                    const fileName = options.nameFromBody ? req.body?.[options.nameFromBody] : undefined;
+                    const oldStorageKey = req.body?.oldStorageKey as string | undefined;
+
+                    const uploaded = await uploadBufferToCloudinary(file, {
+                        folder: options.folder,
+                        fileName,
+                        oldStorageKey,
+                    });
+
+                    req.body[options.targetBodyKey] = uploaded.url;
+                }
+
+                next();
+            } catch (uploadErr) {
+                next(uploadErr);
+            }
+        });
+    };
+};

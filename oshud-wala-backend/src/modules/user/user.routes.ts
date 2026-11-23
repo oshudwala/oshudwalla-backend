@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getMyProfile, updateMyProfile } from './user.controller';
 import { validate } from '../../middlewares/validate.middleware';
+import { autoUpload } from '../../middlewares/autoUpload.middleware';
 import { updateProfileSchema } from './user.validation';
 import { authenticate } from '../../middlewares/auth.middleware';
 import { addNewAddress, getMyAddresses, editAddress, deleteAddress } from './address.controller';
@@ -58,7 +59,7 @@ router.get('/profile', getMyProfile);
  *       200:
  *         description: Profile updated successfully
  */
-router.put('/profile', validate(updateProfileSchema), updateMyProfile);
+router.put('/profile', autoUpload({ folder: 'profiles', targetBodyKey: 'avatarUrl', nameFromBody: 'fullName' }), validate(updateProfileSchema), updateMyProfile);
 
 
 /**

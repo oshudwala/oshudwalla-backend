@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { createNewPharmacy, makePharmacyPrimary, getPharmacies, getMyPharmacies, updatePharmacyProfile, adminUpdatePharmacy, updatePharmacyMedia, updatePharmacyServices, getPharmacyHours, updatePharmacyHours, addPharmacyHoliday, removePharmacyHoliday, createReceptionist, getReceptionists, updateReceptionistStatus } from './pharmacy.controller';
 import { validate } from '../../middlewares/validate.middleware';
+import { autoUpload } from '../../middlewares/autoUpload.middleware';
 import { createPharmacySchema, updatePharmacySchema, adminUpdatePharmacySchema, updatePharmacyMediaSchema, updatePharmacyServicesSchema, getPharmacyHoursSchema, updatePharmacyHoursSchema, addPharmacyHolidaySchema, removePharmacyHolidaySchema, createReceptionistSchema, listReceptionistsSchema, updateReceptionistStatusSchema } from './pharmacy.validation';
 import { authenticate, authorizeRoles } from '../../middlewares/auth.middleware';
 
@@ -15,7 +16,7 @@ router.get('/', getPharmacies);
 router.get('/my', authorizeRoles('PHARMACY', 'RECEPTIONIST'), getMyPharmacies);
 
 // SUPER_ADMIN ONLY ROUTES
-router.post('/admin-create', authorizeRoles('SUPER_ADMIN'), validate(createPharmacySchema), createNewPharmacy);
+router.post('/admin-create', authorizeRoles('SUPER_ADMIN'), autoUpload({ folder: 'pharmacies', targetBodyKey: 'logoUrl', nameFromBody: 'name' }), validate(createPharmacySchema), createNewPharmacy);
 router.put('/admin-primary/:id', authorizeRoles('SUPER_ADMIN'), makePharmacyPrimary);
 router.put('/admin-update/:id', authorizeRoles('SUPER_ADMIN'), validate(adminUpdatePharmacySchema), adminUpdatePharmacy);
 
@@ -29,6 +30,6 @@ router.delete('/:id/holidays/:holidayId', authorizeRoles('SUPER_ADMIN', 'PHARMAC
 router.post('/:id/receptionists', authorizeRoles('SUPER_ADMIN', 'PHARMACY'), validate(createReceptionistSchema), createReceptionist);
 router.get('/:id/receptionists', authorizeRoles('SUPER_ADMIN', 'PHARMACY'), validate(listReceptionistsSchema), getReceptionists);
 router.patch('/:id/receptionists/:staffId/status', authorizeRoles('SUPER_ADMIN', 'PHARMACY'), validate(updateReceptionistStatusSchema), updateReceptionistStatus);
-router.put('/:id', authorizeRoles('SUPER_ADMIN', 'PHARMACY'), validate(updatePharmacySchema), updatePharmacyProfile);
+router.put('/:id', authorizeRoles('SUPER_ADMIN', 'PHARMACY'), autoUpload({ folder: 'pharmacies', targetBodyKey: 'logoUrl', nameFromBody: 'name' }), validate(updatePharmacySchema), updatePharmacyProfile);
 
 export default router;

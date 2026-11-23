@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticate, authorizeRoles } from '../../middlewares/auth.middleware';
 import { validate } from '../../middlewares/validate.middleware';
 import * as c from './promotion.controller';
+import { autoUpload } from '../../middlewares/autoUpload.middleware';
 import { createPromotionSchema, updatePromotionSchema, promotionIdParamSchema } from './promotion.validation';
 
 const router = Router();
@@ -11,8 +12,8 @@ router.get('/', c.listPublicPromotions);
 
 // Super Admin management
 router.get('/admin', authenticate, authorizeRoles('SUPER_ADMIN'), c.listAdminPromotions);
-router.post('/', authenticate, authorizeRoles('SUPER_ADMIN'), validate(createPromotionSchema), c.createPromotion);
-router.put('/:id', authenticate, authorizeRoles('SUPER_ADMIN'), validate(updatePromotionSchema), c.updatePromotion);
+router.post('/', authenticate, authorizeRoles('SUPER_ADMIN'), autoUpload({ folder: 'promotions', targetBodyKey: 'imageUrl', nameFromBody: 'heading' }), validate(createPromotionSchema), c.createPromotion);
+router.put('/:id', authenticate, authorizeRoles('SUPER_ADMIN'), autoUpload({ folder: 'promotions', targetBodyKey: 'imageUrl', nameFromBody: 'heading' }), validate(updatePromotionSchema), c.updatePromotion);
 router.delete('/:id', authenticate, authorizeRoles('SUPER_ADMIN'), validate(promotionIdParamSchema), c.deletePromotion);
 
 export default router;
