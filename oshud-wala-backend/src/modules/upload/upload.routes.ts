@@ -8,7 +8,7 @@ const ALLOWED_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'applica
 
 const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB max per file
+    limits: { fileSize: 5 * 1024 * 1024 },
     fileFilter: (_req, file, cb) => {
         if (!ALLOWED_MIMES.has(file.mimetype)) {
             return cb(new ApiError(400, 'Only JPG, PNG, WEBP, and PDF files are allowed'));
@@ -22,5 +22,6 @@ router.use(authenticate);
 
 router.post('/', upload.single('file'), c.uploadSingle);
 router.post('/multiple', upload.array('files', 5), c.uploadMultiple);
+router.delete('/', c.removeUploadedFile);
 
 export default router;

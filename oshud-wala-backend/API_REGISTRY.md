@@ -127,5 +127,6 @@
 | 121 | Promotion | POST | `/api/v1/promotions` | Yes | SUPER_ADMIN | `{"heading":"Flat 20% Off","paragraph":"Use OSHUD20 on orders above ₹100","imageUrl":"https://...","buttonText":"Apply Coupon","buttonLink":"/medicines","couponCode":"OSHUD20","placement":"HOME_TOP","sortOrder":0}` | Implemented | Verified | Yes |
 | 122 | Promotion | PUT | `/api/v1/promotions/:id` | Yes | SUPER_ADMIN | `{"sortOrder":1,"isActive":false}` | Implemented | Verified | Yes |
 | 123 | Promotion | DELETE | `/api/v1/promotions/:id` | Yes | SUPER_ADMIN | *None* | Implemented | Verified | Yes |
-| 124 | Upload | POST | `/api/v1/uploads` | Yes | All | `multipart/form-data`: `file` (JPG/PNG/WEBP/PDF, max 5MB), `folder` (opt: `prescriptions\|promotions\|pharmacies\|products\|profiles\|doctors`) | Implemented | Verified | Yes |
+| 124 | Upload | POST | `/api/v1/uploads` | Yes | All | `multipart/form-data`: `file` (max 5MB), `folder` (`doctors|pharmacies|promotions|products|profiles|prescriptions`), `fileName` (opt: e.g. `dr-arindam-bose` — auto overwrites old), `oldStorageKey` (opt: deletes old file) | Implemented | Verified | Yes |
 | 125 | Upload | POST | `/api/v1/uploads/multiple` | Yes | All | `multipart/form-data`: `files` (up to 5 files), `folder` (opt) | Implemented | Verified | Yes |
+| 126 | Upload | DELETE | `/api/v1/uploads` | Yes | All | `{"storageKey":"oshudwala/doctors/dr-arindam-bose"}` | Implemented | Verified | Yes |
