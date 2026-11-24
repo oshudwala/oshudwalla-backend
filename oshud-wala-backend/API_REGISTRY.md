@@ -143,3 +143,5 @@
 | 137 | ReceptionistDoctor | GET | `/api/v1/receptionist-doctors/my-doctors` | Yes | RECEPTIONIST | *None* (fast indexed list of assigned doctors) | Implemented | Verified | Yes |
 | 138 | ReceptionistDoctor | GET | `/api/v1/receptionist-doctors/:receptionistUserId` | Yes | SUPER_ADMIN, PHARMACY | *None* | Implemented | Verified | Yes |
 | 139 | PatientSearch | GET | `/api/v1/patients/search` | Yes | SUPER_ADMIN, PHARMACY, RECEPTIONIST, DOCTOR | query: `?q=<patientId\|phone\|name>&limit=15` (fast indexed lookup) | Implemented | Verified | Yes |
+| 140 | BookingRules | GET | `/api/v1/booking-rules` | No | Public | *None* (returns active appointment booking, cancellation, queue & fee rules) | Implemented | Verified | Yes |
+| 141 | BookingRules | PUT | `/api/v1/booking-rules` | Yes | SUPER_ADMIN | `{"maxAdvanceBookingDays":3,"minAdvanceBookingCutoffHours":2,"cancellationDeadlineHours":4,"refundPercentBeforeDeadline":100,"refundPercentAfterDeadline":0,"allowPatientSelfCancel":true,"maxOnlineTokensPerHour":8,"walkInReservationPercent":20,"notifyPatientTokensAhead":3,"platformConvenienceFeeRupees":0,"permittedPaymentMode":"BOTH"}` | Implemented | Verified | Yes |

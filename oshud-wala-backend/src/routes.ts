@@ -25,6 +25,7 @@ import promotionRoutes from './modules/promotion/promotion.routes';
 import uploadRoutes from './modules/upload/upload.routes';
 import reviewRoutes from './modules/review/review.routes';
 import patientSearchRoutes from './modules/patient-search/patient-search.routes';
+import bookingRulesRoutes from './modules/booking-rules/booking-rules.routes';
 import receptionistDoctorRoutes from './modules/receptionist-doctor/receptionist-doctor.routes';
 import featuredRoutes from './modules/featured/featured.routes';
 
@@ -56,6 +57,7 @@ router.use('/promotions', promotionRoutes);
 router.use('/uploads', uploadRoutes);
 router.use('/reviews', reviewRoutes);
 router.use('/patients', patientSearchRoutes);
+router.use('/booking-rules', bookingRulesRoutes);
 router.use('/receptionist-doctors', receptionistDoctorRoutes);
 router.use('/featured', featuredRoutes);
 

@@ -1631,3 +1631,23 @@ model ReceptionistDoctor {
   @@index([pharmacyDoctorId, isActive])
   @@map("receptionist_doctors")
 }
+
+
+model AppointmentBookingRule {
+  id                           String   @id @default("default")
+  maxAdvanceBookingDays        Int      @default(3)
+  minAdvanceBookingCutoffHours Int      @default(2)
+  cancellationDeadlineHours    Int      @default(4)
+  refundPercentBeforeDeadline  Int      @default(100)
+  refundPercentAfterDeadline   Int      @default(0)
+  allowPatientSelfCancel       Boolean  @default(true)
+  maxOnlineTokensPerHour       Int      @default(8)
+  walkInReservationPercent     Int      @default(20)
+  notifyPatientTokensAhead     Int      @default(3)
+  platformConvenienceFeeRupees Int      @default(0)
+  permittedPaymentMode         String   @default("BOTH") // "ONLINE_ONLY" | "CLINIC_ONLY" | "BOTH"
+  updatedById                  String?  @db.Uuid
+  updatedAt                    DateTime @updatedAt
+
+  @@map("appointment_booking_rules")
+}
