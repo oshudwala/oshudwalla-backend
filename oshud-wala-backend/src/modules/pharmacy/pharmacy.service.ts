@@ -44,6 +44,10 @@ export const addPharmacy = async (actor: Actor, data: any) => {
                 latitude: data.latitude ?? null,
                 longitude: data.longitude ?? null,
                 isPrimary: data.isPrimary ?? false,
+                hasClinicService: data.hasClinicService ?? false,
+                hasMedicineService: data.hasMedicineService ?? true,
+                logoUrl: data.logoUrl ? String(data.logoUrl).trim() : null,
+                isFeatured: data.isFeatured ?? false,
             },
             {
                 fullName: String(data.ownerName).trim(),
@@ -136,6 +140,11 @@ export const adminUpdatePharmacy = async (id: string, body: any, actor: Actor) =
         }
         data.status = body.status;
     }
+
+    if (body.isFeatured !== undefined) data.isFeatured = body.isFeatured;
+    if (body.featuredOrder !== undefined) data.featuredOrder = body.featuredOrder;
+    if (body.hasClinicService !== undefined) data.hasClinicService = body.hasClinicService;
+    if (body.hasMedicineService !== undefined) data.hasMedicineService = body.hasMedicineService;
 
     try {
         return await pharmacyRepo.updatePharmacyWithAudit(id, existing, data, actor, 'PHARMACY_ADMIN_UPDATED');

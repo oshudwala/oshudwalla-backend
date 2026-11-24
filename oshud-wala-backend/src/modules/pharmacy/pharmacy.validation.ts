@@ -17,7 +17,11 @@ export const createPharmacySchema = z.object({
         line2: z.string().trim().optional().nullable(),
         latitude: lat.optional().nullable(),
         longitude: lng.optional().nullable(),
-        isPrimary: z.boolean().optional()
+        isPrimary: z.boolean().optional(),
+        hasClinicService: z.boolean().optional(),
+        hasMedicineService: z.boolean().optional(),
+        logoUrl: z.string().optional().nullable(),
+        isFeatured: z.boolean().optional(),
     }).refine((d) => (d.latitude == null) === (d.longitude == null), {
         message: 'latitude and longitude must be provided together',
         path: ['latitude'],
@@ -49,8 +53,12 @@ export const adminUpdatePharmacySchema = z.object({
     body: z.object({
         locationId: z.string().uuid("Valid locationId is required").optional(),
         status: z.enum(['ACTIVE', 'SUSPENDED']).optional(),
-    }).refine((d) => d.locationId !== undefined || d.status !== undefined, {
-        message: 'At least one of locationId or status is required',
+        isFeatured: z.boolean().optional(),
+        featuredOrder: z.number().int().optional(),
+        hasClinicService: z.boolean().optional(),
+        hasMedicineService: z.boolean().optional(),
+    }).refine((d) => d.locationId !== undefined || d.status !== undefined || d.isFeatured !== undefined || d.featuredOrder !== undefined || d.hasClinicService !== undefined || d.hasMedicineService !== undefined, {
+        message: 'At least one field to update is required',
     }),
 });
 
