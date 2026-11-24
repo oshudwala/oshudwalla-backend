@@ -1,11 +1,13 @@
 import { RoleName, SlotStatus } from '@prisma/client';
 import { ApiError } from '../../utils/apiError';
 import * as repo from './schedule.repository';
+import { assertNoDoctorTimingConflict } from './schedule.conflict';
 
 type Actor = { id: string; role: RoleName };
 
 const toUtcDate = (iso: string): Date => new Date(`${iso}T00:00:00.000Z`);
 const dateKey = (d: Date): string => d.toISOString().slice(0, 10);
+const getWeekOfMonth = (d: Date): number => Math.ceil(d.getUTCDate() / 7);
 
 const assertCanManagePharmacyDoctor = async (pharmacyDoctorId: string, actor: Actor) => {
     const pd = await repo.findPharmacyDoctorWithContext(pharmacyDoctorId);
@@ -29,7 +31,7 @@ const assertCanManagePharmacyDoctor = async (pharmacyDoctorId: string, actor: Ac
 };
 
 export const createSchedule = async (body: any, actor: Actor) => {
-    await assertCanManagePharmacyDoctor(body.pharmacyDoctorId, actor);
+    const pd = await assertCanManagePharmacyDoctor(body.pharmacyDoctorId, actor);
 
     const validFrom = toUtcDate(body.validFrom);
     const validTo = body.validTo ? toUtcDate(body.validTo) : null;
@@ -37,10 +39,33 @@ export const createSchedule = async (body: any, actor: Actor) => {
         throw new ApiError(400, 'validTo must be on or after validFrom');
     }
 
+    const recurrenceType = body.recurrenceType || 'WEEKLY';
+    const specificDate = body.specificDate ? toUtcDate(body.specificDate) : null;
+    const dayOfWeek =
+        recurrenceType === 'SPECIFIC_DATE' && specificDate
+            ? specificDate.getUTCDay()
+            : body.dayOfWeek ?? 0;
+    const weekOfMonth = recurrenceType === 'MONTHLY_WEEK_DAY' ? body.weekOfMonth : null;
+
+    // Cross-clinic & same-clinic conflict check
+    await assertNoDoctorTimingConflict(pd.doctorId, {
+        recurrenceType,
+        dayOfWeek,
+        weekOfMonth,
+        specificDate,
+        startMinute: body.startMinute,
+        endMinute: body.endMinute,
+        validFrom,
+        validTo,
+    });
+
     return await repo.createScheduleWithAudit(
         {
             pharmacyDoctorId: body.pharmacyDoctorId,
-            dayOfWeek: body.dayOfWeek,
+            recurrenceType,
+            dayOfWeek,
+            weekOfMonth,
+            specificDate,
             startMinute: body.startMinute,
             endMinute: body.endMinute,
             slotDurationMinutes: body.slotDurationMinutes,
@@ -75,6 +100,22 @@ export const saveException = async (body: any, actor: Actor) => {
     );
 };
 
+const matchesScheduleOnDate = (s: any, current: Date, key: string, dow: number, wom: number): boolean => {
+    if (s.validFrom > current || (s.validTo && s.validTo < current)) return false;
+
+    switch (s.recurrenceType) {
+        case 'DAILY':
+            return true;
+        case 'SPECIFIC_DATE':
+            return s.specificDate ? dateKey(s.specificDate) === key : false;
+        case 'MONTHLY_WEEK_DAY':
+            return s.dayOfWeek === dow && s.weekOfMonth === wom;
+        case 'WEEKLY':
+        default:
+            return s.dayOfWeek === dow;
+    }
+};
+
 export const generateSlots = async (body: any, actor: Actor) => {
     const pd = await assertCanManagePharmacyDoctor(body.pharmacyDoctorId, actor);
     const fromDate = toUtcDate(body.fromDate);
@@ -101,9 +142,8 @@ export const generateSlots = async (body: any, actor: Actor) => {
         if (exc && exc.type === 'LEAVE') continue;
 
         const dow = current.getUTCDay();
-        const daySchedules = schedules.filter(
-            (s) => s.dayOfWeek === dow && s.validFrom <= current && (!s.validTo || s.validTo >= current)
-        );
+        const wom = getWeekOfMonth(current);
+        const daySchedules = schedules.filter((s) => matchesScheduleOnDate(s, current, key, dow, wom));
         if (daySchedules.length === 0) continue;
 
         if (exc && exc.type === 'MODIFIED_HOURS' && exc.startMinute != null && exc.endMinute != null) {

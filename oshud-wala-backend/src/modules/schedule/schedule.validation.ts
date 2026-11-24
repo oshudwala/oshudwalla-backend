@@ -5,7 +5,10 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD
 export const createScheduleSchema = z.object({
     body: z.object({
         pharmacyDoctorId: z.string().uuid("Valid pharmacyDoctorId is required"),
-        dayOfWeek: z.number().int().min(0).max(6),
+        recurrenceType: z.enum(['DAILY', 'WEEKLY', 'MONTHLY_WEEK_DAY', 'SPECIFIC_DATE']).default('WEEKLY'),
+        dayOfWeek: z.number().int().min(0).max(6).optional(),
+        weekOfMonth: z.number().int().min(1).max(5).optional().nullable(),
+        specificDate: isoDate.optional().nullable(),
         startMinute: z.number().int().min(0).max(1439),
         endMinute: z.number().int().min(1).max(1440),
         slotDurationMinutes: z.number().int().min(5).max(240),
@@ -20,6 +23,18 @@ export const createScheduleSchema = z.object({
         .refine((d) => d.endMinute - d.startMinute >= d.slotDurationMinutes, {
             message: 'Schedule window must be at least as long as slotDurationMinutes',
             path: ['slotDurationMinutes'],
+        })
+        .refine((d) => d.recurrenceType !== 'SPECIFIC_DATE' || !!d.specificDate, {
+            message: 'specificDate is required for SPECIFIC_DATE recurrence',
+            path: ['specificDate'],
+        })
+        .refine((d) => d.recurrenceType !== 'MONTHLY_WEEK_DAY' || (d.weekOfMonth != null && d.dayOfWeek != null), {
+            message: 'weekOfMonth (1-5) and dayOfWeek (0-6) are required for MONTHLY_WEEK_DAY recurrence',
+            path: ['weekOfMonth'],
+        })
+        .refine((d) => d.recurrenceType !== 'WEEKLY' || d.dayOfWeek != null, {
+            message: 'dayOfWeek (0-6) is required for WEEKLY recurrence',
+            path: ['dayOfWeek'],
         }),
 });
 
