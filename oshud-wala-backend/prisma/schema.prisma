@@ -388,6 +388,7 @@ model User {
   @@index([roleId])
   @@index([status])
   reviews Review[]
+  receptionistDoctors ReceptionistDoctor[]
   @@map("users")
 }
 
@@ -602,6 +603,10 @@ model Pharmacy {
   @@index([status])
   @@index([locationId])
   reviews Review[]
+  isFeatured    Boolean @default(false)
+  featuredOrder Int     @default(0)
+
+  @@index([isFeatured, featuredOrder])
   @@map("pharmacies")
 }
 
@@ -678,6 +683,10 @@ model Doctor {
   pharmacies      PharmacyDoctor[]
   notifications   Notification[]         @relation("DoctorNotifications") // Pending notifications wait here
   reviews Review[]
+  isFeatured    Boolean @default(false)
+  featuredOrder Int     @default(0)
+
+  @@index([isFeatured, featuredOrder])
 
   @@map("doctors")
 }
@@ -711,6 +720,7 @@ model PharmacyDoctor {
 
   @@unique([pharmacyId, doctorId])
   @@index([pharmacyId, isActive])
+  receptionists ReceptionistDoctor[]
   @@map("pharmacy_doctors")
 }
 
@@ -1604,4 +1614,20 @@ model Review {
   @@index([pharmacyId])
   @@index([doctorId])
   @@map("reviews")
+}
+
+
+model ReceptionistDoctor {
+  id                 String         @id @default(uuid()) @db.Uuid
+  receptionistUserId String         @db.Uuid
+  receptionist       User           @relation(fields: [receptionistUserId], references: [id], onDelete: Cascade)
+  pharmacyDoctorId   String         @db.Uuid
+  pharmacyDoctor     PharmacyDoctor @relation(fields: [pharmacyDoctorId], references: [id], onDelete: Cascade)
+  isActive           Boolean        @default(true)
+  createdAt          DateTime       @default(now())
+
+  @@unique([receptionistUserId, pharmacyDoctorId])
+  @@index([receptionistUserId, isActive])
+  @@index([pharmacyDoctorId, isActive])
+  @@map("receptionist_doctors")
 }

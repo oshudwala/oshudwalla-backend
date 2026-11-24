@@ -134,3 +134,12 @@
 | 128 | Review | GET | `/api/v1/reviews/pharmacy/:pharmacyId` | No | Public | query: `page, limit` (returns `averageRating` out of 5, `totalReviews`, `breakdown`, `reviews[]`) | Implemented | Verified | Yes |
 | 129 | Review | GET | `/api/v1/reviews/doctor/:doctorId` | No | Public | query: `page, limit` (returns `averageRating` out of 5, `totalReviews`, `breakdown`, `reviews[]`) | Implemented | Verified | Yes |
 | 130 | Review | DELETE | `/api/v1/reviews/:id` | Yes | PATIENT (own), SUPER_ADMIN | *None* | Implemented | Verified | Yes |
+| 131 | Featured | GET | `/api/v1/featured/doctors` | No | Public | *None* (ordered by `featuredOrder` ASC) | Implemented | Verified | Yes |
+| 132 | Featured | GET | `/api/v1/featured/clinics` | No | Public | *None* (ordered by `featuredOrder` ASC) | Implemented | Verified | Yes |
+| 133 | Featured | PATCH | `/api/v1/featured/doctors/:id` | Yes | SUPER_ADMIN | `{"isFeatured":true,"featuredOrder":1}` | Implemented | Verified | Yes |
+| 134 | Featured | PATCH | `/api/v1/featured/clinics/:id` | Yes | SUPER_ADMIN | `{"isFeatured":true,"featuredOrder":1}` | Implemented | Verified | Yes |
+| 135 | ReceptionistDoctor | POST | `/api/v1/receptionist-doctors/assign` | Yes | SUPER_ADMIN, PHARMACY | `{"receptionistUserId":"uuid","pharmacyDoctorIds":["uuid1","uuid2"]}` | Implemented | Verified | Yes |
+| 136 | ReceptionistDoctor | DELETE | `/api/v1/receptionist-doctors/unassign` | Yes | SUPER_ADMIN, PHARMACY | `{"receptionistUserId":"uuid","pharmacyDoctorId":"uuid"}` | Implemented | Verified | Yes |
+| 137 | ReceptionistDoctor | GET | `/api/v1/receptionist-doctors/my-doctors` | Yes | RECEPTIONIST | *None* (fast indexed list of assigned doctors) | Implemented | Verified | Yes |
+| 138 | ReceptionistDoctor | GET | `/api/v1/receptionist-doctors/:receptionistUserId` | Yes | SUPER_ADMIN, PHARMACY | *None* | Implemented | Verified | Yes |
+| 139 | PatientSearch | GET | `/api/v1/patients/search` | Yes | SUPER_ADMIN, PHARMACY, RECEPTIONIST, DOCTOR | query: `?q=<patientId\|phone\|name>&limit=15` (fast indexed lookup) | Implemented | Verified | Yes |
