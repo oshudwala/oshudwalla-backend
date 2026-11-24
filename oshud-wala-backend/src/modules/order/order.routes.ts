@@ -18,5 +18,6 @@ router.get('/my', authorizeRoles('PATIENT'), c.getMyOrders);
 router.get('/pharmacy/:pharmacyId', authorizeRoles('SUPER_ADMIN', 'PHARMACY'), validate(orderPharmacyParamSchema), c.getPharmacyOrders);
 router.patch('/:id/status', authorizeRoles('SUPER_ADMIN', 'PHARMACY'), validate(updateOrderStatusSchema), c.updateOrderStatus);
 router.patch('/:id/cancel', authorizeRoles('PATIENT', 'SUPER_ADMIN'), validate(cancelOrderSchema), c.cancelOrder);
+router.get('/:id/invoice.pdf', authorizeRoles('PATIENT', 'SUPER_ADMIN', 'PHARMACY'), c.downloadInvoicePdf);
 
 export default router;

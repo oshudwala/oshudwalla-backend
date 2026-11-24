@@ -31,3 +31,8 @@ export const cancelOrder = asyncHandler(async (req: AuthRequest, res: Response) 
     const data = await service.cancelOrder(req.params.id, req.body.cancelReason, actorOf(req));
     res.status(200).json(new ApiResponse(200, data, 'Order cancelled'));
 });
+import { streamOrderInvoicePdf } from './order.invoice';
+
+export const downloadInvoicePdf = asyncHandler(async (req: AuthRequest, res: Response) => {
+    await streamOrderInvoicePdf(req.params.id, req.user!.userId, req.user!.role, res);
+});

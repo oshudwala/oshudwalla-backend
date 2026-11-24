@@ -151,7 +151,7 @@ export const placeOrderFromCartTx = (
                     paymentMethod: 'COD',
                     paymentStatus: 'PENDING',
                     subtotalPaise,
-                    discountPaise,
+                    couponDiscountPaise: discountPaise,
                     deliveryFeePaise,
                     totalPaise,
                     idempotencyKey,
@@ -187,7 +187,7 @@ export const placeOrderFromCartTx = (
                     action: 'ORDER_PLACED',
                     entityType: 'Order',
                     entityId: order.id,
-                    after: { orderNumber: order.orderNumber, totalPaise, discountPaise, couponId, pharmacyId: targetPharmacyId } as any,
+                    after: { orderNumber: order.orderNumber, totalPaise, couponDiscountPaise: discountPaise, couponId, pharmacyId: targetPharmacyId } as any,
                 },
             });
 
