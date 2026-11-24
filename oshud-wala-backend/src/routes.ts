@@ -23,6 +23,7 @@ import referralRoutes from './modules/referral/referral.routes';
 import supportRoutes from './modules/support/support.routes';
 import promotionRoutes from './modules/promotion/promotion.routes';
 import uploadRoutes from './modules/upload/upload.routes';
+import reviewRoutes from './modules/review/review.routes';
 
 const router = Router();
 
@@ -50,5 +51,6 @@ router.use('/referrals', referralRoutes);
 router.use('/support', supportRoutes);
 router.use('/promotions', promotionRoutes);
 router.use('/uploads', uploadRoutes);
+router.use('/reviews', reviewRoutes);
 
 export default router;

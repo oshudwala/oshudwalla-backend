@@ -387,6 +387,7 @@ model User {
 
   @@index([roleId])
   @@index([status])
+  reviews Review[]
   @@map("users")
 }
 
@@ -600,6 +601,7 @@ model Pharmacy {
   @@index([city, status])
   @@index([status])
   @@index([locationId])
+  reviews Review[]
   @@map("pharmacies")
 }
 
@@ -675,6 +677,7 @@ model Doctor {
   specializations DoctorSpecialization[]
   pharmacies      PharmacyDoctor[]
   notifications   Notification[]         @relation("DoctorNotifications") // Pending notifications wait here
+  reviews Review[]
 
   @@map("doctors")
 }
@@ -717,6 +720,9 @@ model DoctorSchedule {
   id                  String         @id @default(uuid()) @db.Uuid
   pharmacyDoctorId    String         @db.Uuid
   pharmacyDoctor      PharmacyDoctor @relation(fields: [pharmacyDoctorId], references: [id], onDelete: Cascade)
+  recurrenceType      String    @default("WEEKLY")
+  weekOfMonth         Int?
+  specificDate        DateTime? @db.Date
   dayOfWeek           Int
   startMinute         Int
   endMinute           Int
@@ -1576,4 +1582,26 @@ model Promotion {
 
   @@index([isActive, placement, sortOrder])
   @@map("promotions")
+}
+
+
+model Review {
+  id         String    @id @default(uuid()) @db.Uuid
+  patientId  String    @db.Uuid
+  patient    User      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  targetType String    // "PHARMACY" | "DOCTOR"
+  pharmacyId String?   @db.Uuid
+  pharmacy   Pharmacy? @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  doctorId   String?   @db.Uuid
+  doctor     Doctor?   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  rating     Int       // 1 to 5
+  comment    String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([patientId, pharmacyId])
+  @@unique([patientId, doctorId])
+  @@index([pharmacyId])
+  @@index([doctorId])
+  @@map("reviews")
 }

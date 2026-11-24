@@ -130,3 +130,7 @@
 | 124 | Upload | POST | `/api/v1/uploads` | Yes | All | `multipart/form-data`: `file` (max 5MB), `folder` (`doctors|pharmacies|promotions|products|profiles|prescriptions`), `fileName` (opt: e.g. `dr-arindam-bose` — auto overwrites old), `oldStorageKey` (opt: deletes old file) | Implemented | Verified | Yes |
 | 125 | Upload | POST | `/api/v1/uploads/multiple` | Yes | All | `multipart/form-data`: `files` (up to 5 files), `folder` (opt) | Implemented | Verified | Yes |
 | 126 | Upload | DELETE | `/api/v1/uploads` | Yes | All | `{"storageKey":"oshudwala/doctors/dr-arindam-bose"}` | Implemented | Verified | Yes |
+| 127 | Review | POST | `/api/v1/reviews` | Yes | PATIENT | `{"targetType":"PHARMACY\|DOCTOR","targetId":"uuid","rating":5,"comment":"Great service!"}` (1-5 stars, auto updates if already rated) | Implemented | Verified | Yes |
+| 128 | Review | GET | `/api/v1/reviews/pharmacy/:pharmacyId` | No | Public | query: `page, limit` (returns `averageRating` out of 5, `totalReviews`, `breakdown`, `reviews[]`) | Implemented | Verified | Yes |
+| 129 | Review | GET | `/api/v1/reviews/doctor/:doctorId` | No | Public | query: `page, limit` (returns `averageRating` out of 5, `totalReviews`, `breakdown`, `reviews[]`) | Implemented | Verified | Yes |
+| 130 | Review | DELETE | `/api/v1/reviews/:id` | Yes | PATIENT (own), SUPER_ADMIN | *None* | Implemented | Verified | Yes |
