@@ -80,6 +80,7 @@ export const updateGlobalDoctor = async (id: string, body: any, actor: Actor) =>
     if (body.bio !== undefined) data.bio = body.bio ? String(body.bio).trim() : null;
     if (body.languages !== undefined) data.languages = body.languages;
     if (body.isVerified !== undefined) data.isVerified = body.isVerified;
+    if (body.isFeatured !== undefined) data.isFeatured = body.isFeatured;
 
     try {
         return await doctorRepo.updateGlobalDoctorWithAudit(id, existing, data, uniqueSpecIds, actor);

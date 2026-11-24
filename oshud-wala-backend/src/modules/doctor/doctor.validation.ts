@@ -29,6 +29,7 @@ export const createGlobalDoctorSchema = z.object({
         languages: z.array(z.string().trim().min(1).max(40)).max(10).optional(),
         specializationIds: z.array(z.string().uuid("Invalid specializationId")).min(1, "At least one specialization is required").max(10),
         isVerified: z.boolean().optional(),
+        isFeatured: z.boolean().optional(),
     }).refine((d) => Boolean(d.phone || d.email), {
         message: "Either phone or email must be provided",
         path: ["phone"],
@@ -45,6 +46,7 @@ export const updateGlobalDoctorSchema = z.object({
         languages: z.array(z.string().trim().min(1).max(40)).max(10).optional(),
         specializationIds: z.array(z.string().uuid()).min(1).max(10).optional(),
         isVerified: z.boolean().optional(),
+        isFeatured: z.boolean().optional(),
     }).refine((d) => Object.keys(d).length > 0, {
         message: "At least one field is required",
     }),

@@ -173,6 +173,7 @@ export const createGlobalDoctorWithAudit = (data: any, specializationIds: string
                     bio: data.bio ?? null,
                     languages: data.languages ?? [],
                     isVerified: data.isVerified ?? false,
+                    isFeatured: data.isFeatured ?? false,
                     specializations: {
                         create: specializationIds.map((specializationId) => ({ specializationId })),
                     },
