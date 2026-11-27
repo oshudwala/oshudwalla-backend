@@ -372,9 +372,9 @@ export const scanPickupQrTx = (qrToken: string, riderId: string, actor: Actor) =
                     await tx.deliveryStatusHistory.create({
                         data: { deliveryId: d.id, fromStatus: d.status, toStatus: 'PICKED_UP', riderId: actualUserId, actorId: actor.id },
                     });
-                    await tx.order.update({ where: { id: d.orderId }, data: { status: 'OUT_FOR_DELIVERY' } });
+                    await tx.order.update({ where: { id: d.orderId }, data: { status: 'SHIPPED' } });
                     await tx.orderStatusHistory.create({
-                        data: { orderId: d.orderId, fromStatus: 'RIDER_ASSIGNED', toStatus: 'OUT_FOR_DELIVERY', actorId: actor.id, actorRole: actor.role },
+                        data: { orderId: d.orderId, fromStatus: 'RIDER_ASSIGNED', toStatus: 'SHIPPED', actorId: actor.id, actorRole: actor.role },
                     });
                 }
 
@@ -421,11 +421,11 @@ export const scanPickupQrTx = (qrToken: string, riderId: string, actor: Actor) =
                 }
 
                 const now = new Date();
-                const updatedOrders = [];
+                const updatedOrders: any[] = [];
                 for (const oId of cached.orderIds) {
                     const ord = await tx.order.update({
                         where: { id: oId },
-                        data: { status: 'OUT_FOR_DELIVERY' },
+                        data: { status: 'SHIPPED' },
                         include: {
                             items: true,
                             pharmacy: { select: { id: true, name: true, phone: true, line1: true } },
@@ -449,7 +449,7 @@ export const scanPickupQrTx = (qrToken: string, riderId: string, actor: Actor) =
                     verified: true,
                     batchId: cached.batchId,
                     pickedUpCount: updatedOrders.length,
-                    orders: updatedOrders.map((o) => ({
+                    orders: updatedOrders.map((o: any) => ({
                         id: o.id,
                         orderNumber: o.orderNumber,
                         status: 'OUT_FOR_DELIVERY',
@@ -463,7 +463,7 @@ export const scanPickupQrTx = (qrToken: string, riderId: string, actor: Actor) =
                         pharmacyName: o.pharmacy?.name || 'Fulfillment Pharmacy',
                         pharmacyPhone: o.pharmacy?.phone || '',
                         pharmacyAddress: o.pharmacy?.line1 || 'Dispensary Hub',
-                        items: o.items.map((it: any) => ({
+                        items: (o.items || []).map((it: any) => ({
                             id: it.id,
                             name: it.nameSnapshot,
                             quantity: it.quantity,
