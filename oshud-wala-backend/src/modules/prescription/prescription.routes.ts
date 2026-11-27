@@ -10,6 +10,8 @@ const router = Router();
 router.use(authenticate);
 
 router.post('/', authorizeRoles('PATIENT'), autoUploadPrescriptionFiles(), validate(createPrescriptionSchema), c.submitPrescription);
+router.post('/upload', authorizeRoles('PATIENT'), autoUploadPrescriptionFiles(), validate(createPrescriptionSchema), c.submitPrescription);
+router.get('/', authorizeRoles('SUPER_ADMIN', 'PHARMACY'), c.getPharmacyPrescriptionsForCurrentUser);
 router.get('/my', authorizeRoles('PATIENT'), c.getMyPrescriptions);
 router.get('/pharmacy/:pharmacyId', authorizeRoles('SUPER_ADMIN', 'PHARMACY'), validate(pharmacyParamSchema), c.getPharmacyPrescriptions);
 router.patch('/:id/review', authorizeRoles('SUPER_ADMIN', 'PHARMACY'), validate(reviewPrescriptionSchema), c.reviewPrescription);

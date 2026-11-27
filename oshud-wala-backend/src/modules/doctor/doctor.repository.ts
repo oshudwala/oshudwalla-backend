@@ -213,6 +213,19 @@ export const updateGlobalDoctorWithAudit = (id: string, before: any, data: any, 
                 include: doctorInclude,
             });
 
+            if (before.userId) {
+                const userUpdate: any = {};
+                if (data.fullName) userUpdate.fullName = data.fullName;
+                if (data.phone) userUpdate.phone = data.phone;
+                if (data.email !== undefined) userUpdate.email = data.email;
+                if (Object.keys(userUpdate).length > 0) {
+                    await tx.user.update({
+                        where: { id: before.userId },
+                        data: userUpdate,
+                    });
+                }
+            }
+
             await tx.auditLog.create({
                 data: {
                     actorId: actor.id,

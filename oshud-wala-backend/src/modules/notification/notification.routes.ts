@@ -1,21 +1,54 @@
 import { Router } from 'express';
-import { registerToken, removeToken, getPreferences, updatePreferences, sendTestPush } from './notification.controller';
+import {
+    registerToken,
+    removeToken,
+    getPreferences,
+    updatePreferences,
+    sendTestPush,
+    getMyNotifications,
+    getUnreadCount,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+    deleteNotification,
+    clearReadNotifications,
+    createNotification,
+} from './notification.controller';
 import { registerTokenSchema, updatePreferencesSchema } from './notification.validation';
 import { validate } from '../../middlewares/validate.middleware';
 import { authenticate } from '../../middlewares/auth.middleware';
 
-
 const router = Router();
-
-/**
- * @swagger
- * tags:
- *   name: Notification
- *   description: Notification & Device Token Management
- */
 
 // Protect all notification routes
 router.use(authenticate);
+
+// ---------------------------------------------------------------------------
+// IN-APP NOTIFICATIONS (Strictly isolated by authenticated userId)
+// ---------------------------------------------------------------------------
+
+// Get current user's dedicated notifications
+router.get('/', getMyNotifications);
+
+// Get current user's unread count
+router.get('/unread-count', getUnreadCount);
+
+// Mark all notifications as read for current user
+router.patch('/read-all', markAllNotificationsAsRead);
+router.post('/read-all', markAllNotificationsAsRead);
+router.put('/read-all', markAllNotificationsAsRead);
+
+// Clear all read notifications for current user
+router.delete('/', clearReadNotifications);
+
+// Create an in-app notification
+router.post('/', createNotification);
+
+// Mark specific notification as read (scoped to current user)
+router.patch('/:id/read', markNotificationAsRead);
+router.put('/:id/read', markNotificationAsRead);
+
+// Delete specific notification (scoped to current user)
+router.delete('/:id', deleteNotification);
 
 /**
  * @swagger

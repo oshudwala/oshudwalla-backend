@@ -21,3 +21,8 @@ export const updateRiderStatus = asyncHandler(async (req: AuthRequest, res: Resp
     const data = await service.updateRiderStatus(req.params.userId, req.body, actorOf(req));
     res.status(200).json(new ApiResponse(200, data, 'Rider status updated'));
 });
+
+export const updateRider = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const data = await service.updateRider(req.params.id, req.body, actorOf(req));
+    res.status(200).json(new ApiResponse(200, data, 'Rider profile updated'));
+});

@@ -14,8 +14,11 @@ const router = Router();
 
 router.use(authenticate);
 
-// Super Admin assigns ready orders to rider
-router.post('/assign', authorizeRoles('SUPER_ADMIN'), validate(assignDeliveriesSchema), c.assignDeliveries);
+// Super Admin or Pharmacy assigns ready orders to rider
+router.post('/assign', authorizeRoles('SUPER_ADMIN', 'PHARMACY'), validate(assignDeliveriesSchema), c.assignDeliveries);
+
+// Fetch active pickup QR for an order (Admin, Pharmacy, Rider)
+router.get('/order/:orderId/pickup-qr', authorizeRoles('SUPER_ADMIN', 'PHARMACY', 'RIDER'), validate(orderIdParamSchema), c.getOrderPickupQr);
 
 // Rider endpoints
 router.get('/my', authorizeRoles('RIDER'), c.getMyDeliveries);

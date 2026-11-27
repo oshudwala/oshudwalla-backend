@@ -12,6 +12,11 @@ export const assignDeliveries = asyncHandler(async (req: AuthRequest, res: Respo
     res.status(201).json(new ApiResponse(201, data, 'Orders assigned to rider and Pickup QR generated'));
 });
 
+export const getOrderPickupQr = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const data = await service.getOrderPickupQr(req.params.orderId, actorOf(req));
+    res.status(200).json(new ApiResponse(200, data, 'Active pickup QR retrieved for order'));
+});
+
 export const getMyDeliveries = asyncHandler(async (req: AuthRequest, res: Response) => {
     const data = await service.getMyDeliveries(req.user!.userId);
     res.status(200).json(new ApiResponse(200, data, 'Assigned deliveries retrieved'));

@@ -44,3 +44,57 @@ export const modifyPreferences = async (userId: string, globalSettings?: any, ca
 
     return await fetchPreferences(userId); // Return combined result
 };
+
+// ---------------------------------------------------------------------------
+// IN-APP NOTIFICATIONS (Strictly isolated by userId with NO demo/dummy data)
+// ---------------------------------------------------------------------------
+
+export const fetchUserNotifications = async (userId: string, role?: string, options: any = {}) => {
+    if (!userId) throw new ApiError(401, 'Unauthorized access');
+    // Only return real/original notifications from the database for this specific user
+    return await notificationRepo.getNotificationsByUser(userId, options);
+};
+
+export const countUnread = async (userId: string) => {
+    if (!userId) throw new ApiError(401, 'Unauthorized access');
+    const unreadCount = await notificationRepo.getUnreadCountByUser(userId);
+    return { unreadCount };
+};
+
+export const markRead = async (notificationId: string, userId: string) => {
+    if (!userId) throw new ApiError(401, 'Unauthorized access');
+    await notificationRepo.markNotificationRead(notificationId, userId);
+    return { success: true, notificationId };
+};
+
+export const markAllRead = async (userId: string) => {
+    if (!userId) throw new ApiError(401, 'Unauthorized access');
+    await notificationRepo.markAllNotificationsRead(userId);
+    return { success: true };
+};
+
+export const removeNotification = async (notificationId: string, userId: string) => {
+    if (!userId) throw new ApiError(401, 'Unauthorized access');
+    await notificationRepo.deleteNotification(notificationId, userId);
+    return { success: true, notificationId };
+};
+
+export const clearRead = async (userId: string) => {
+    if (!userId) throw new ApiError(401, 'Unauthorized access');
+    await notificationRepo.clearReadNotifications(userId);
+    return { success: true };
+};
+
+export const createNotification = async (userId: string, data: any) => {
+    if (!userId) throw new ApiError(401, 'Unauthorized access');
+    const created = await notificationRepo.createInAppNotification({
+        userId: data.userId || userId,
+        category: data.category || 'SYSTEM',
+        eventType: data.eventType || 'MANUAL_ALERT',
+        title: data.title,
+        body: data.body,
+        data: data.data || {},
+        priority: data.priority || 'NORMAL',
+    });
+    return created;
+};

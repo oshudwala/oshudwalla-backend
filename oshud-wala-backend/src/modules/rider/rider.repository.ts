@@ -52,14 +52,95 @@ export const createRiderTx = (userData: any, profileData: any, actor: Actor) =>
         { maxWait: 10000, timeout: 30000 }
     );
 
-export const listRiders = () =>
-    prisma.riderProfile.findMany({
+export const listRiders = async () => {
+    const profiles = await prisma.riderProfile.findMany({
         orderBy: { createdAt: 'desc' },
         include: { user: { select: { id: true, fullName: true, phone: true, email: true, status: true } } },
     });
 
+    const existingUserIds = new Set(profiles.map((p) => p.userId));
+
+    // Find any users with role RIDER who don't have a profile yet
+    const orphanRiders = await prisma.user.findMany({
+        where: {
+            role: { name: 'RIDER' },
+            status: 'ACTIVE',
+            id: { notIn: Array.from(existingUserIds) },
+        },
+        select: { id: true, fullName: true, phone: true, email: true, status: true },
+    });
+
+    for (const u of orphanRiders) {
+        try {
+            const created = await prisma.riderProfile.create({
+                data: {
+                    userId: u.id,
+                    kycStatus: 'APPROVED',
+                    status: 'AVAILABLE',
+                },
+                include: { user: { select: { id: true, fullName: true, phone: true, email: true, status: true } } },
+            });
+            profiles.push(created);
+        } catch {
+            // ignore if race condition created it
+        }
+    }
+
+    return profiles;
+};
+
 export const findRiderByUserId = (userId: string) =>
     prisma.riderProfile.findUnique({ where: { userId } });
+
+export const findRiderByIdOrUserId = (id: string) =>
+    prisma.riderProfile.findFirst({
+        where: { OR: [{ id }, { userId: id }] },
+        include: { user: { select: { id: true, fullName: true, phone: true, email: true, status: true } } },
+    });
+
+export const updateRiderTx = (
+    riderId: string,
+    profileData: any,
+    userData: any,
+    actor: Actor
+) =>
+    prisma.$transaction(async (tx) => {
+        const existing = await tx.riderProfile.findFirst({
+            where: { OR: [{ id: riderId }, { userId: riderId }] },
+            include: { user: true },
+        });
+        if (!existing) throw new Error('Rider profile not found');
+
+        const updatedProfile = await tx.riderProfile.update({
+            where: { id: existing.id },
+            data: profileData,
+            include: { user: { select: { id: true, fullName: true, phone: true, email: true, status: true } } },
+        });
+
+        if (Object.keys(userData).length > 0) {
+            await tx.user.update({
+                where: { id: existing.userId },
+                data: userData,
+            });
+        }
+
+        await tx.auditLog.create({
+            data: {
+                actorId: actor.id,
+                actorRole: actor.role,
+                action: 'RIDER_PROFILE_UPDATED',
+                entityType: 'RiderProfile',
+                entityId: existing.id,
+                before: { ...existing } as any,
+                after: { ...updatedProfile, ...userData } as any,
+            },
+        });
+
+        return tx.riderProfile.findUnique({
+            where: { id: existing.id },
+            include: { user: { select: { id: true, fullName: true, phone: true, email: true, status: true } } },
+        });
+    });
 
 export const updateRiderStatusTx = (userId: string, before: any, data: any, actor: Actor) =>
     prisma.$transaction(async (tx) => {

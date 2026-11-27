@@ -32,6 +32,14 @@ const startServer = async () => {
         await prisma.$connect();
         console.log('📦 Connected to Supabase PostgreSQL');
 
+        try {
+            await prisma.$executeRawUnsafe('ALTER TABLE "promotions" ADD COLUMN IF NOT EXISTS "secondaryButtonText" TEXT;');
+            await prisma.$executeRawUnsafe('ALTER TABLE "promotions" ADD COLUMN IF NOT EXISTS "secondaryButtonLink" TEXT;');
+            console.log('✅ Promotions table schema verified');
+        } catch (dbErr: any) {
+            console.warn('Notice checking promotions columns:', dbErr?.message || dbErr);
+        }
+
         server.listen(PORT, () => {
             console.log(`🚀 Oshud Wala Server running on http://localhost:${PORT}`);
         });

@@ -15,6 +15,8 @@ export const createPromotion = async (body: any, actor: Actor) => {
             imageUrl: String(body.imageUrl).trim(),
             buttonText: body.buttonText ? String(body.buttonText).trim() : null,
             buttonLink: body.buttonLink ? String(body.buttonLink).trim() : null,
+            secondaryButtonText: body.secondaryButtonText ? String(body.secondaryButtonText).trim() : null,
+            secondaryButtonLink: body.secondaryButtonLink ? String(body.secondaryButtonLink).trim() : null,
             couponCode: body.couponCode ? String(body.couponCode).trim().toUpperCase() : null,
             placement: body.placement ? String(body.placement).trim() : 'HOME_TOP',
             sortOrder: body.sortOrder ?? 0,
@@ -36,6 +38,8 @@ export const updatePromotion = async (id: string, body: any, actor: Actor) => {
     if (body.imageUrl !== undefined) data.imageUrl = String(body.imageUrl).trim();
     if (body.buttonText !== undefined) data.buttonText = body.buttonText ? String(body.buttonText).trim() : null;
     if (body.buttonLink !== undefined) data.buttonLink = body.buttonLink ? String(body.buttonLink).trim() : null;
+    if (body.secondaryButtonText !== undefined) data.secondaryButtonText = body.secondaryButtonText ? String(body.secondaryButtonText).trim() : null;
+    if (body.secondaryButtonLink !== undefined) data.secondaryButtonLink = body.secondaryButtonLink ? String(body.secondaryButtonLink).trim() : null;
     if (body.couponCode !== undefined) data.couponCode = body.couponCode ? String(body.couponCode).trim().toUpperCase() : null;
     if (body.placement !== undefined) data.placement = String(body.placement).trim();
     if (body.sortOrder !== undefined) data.sortOrder = body.sortOrder;

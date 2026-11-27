@@ -15,7 +15,7 @@ router.get('/doctors', asyncHandler(async (_req: Request, res: Response) => {
             specializations: { include: { specialization: true } },
             pharmacies: {
                 where: { isActive: true },
-                include: { pharmacy: { select: { id: true, name: true, city: true, area: true } as any } },
+                include: { pharmacy: { select: { id: true, name: true, line1: true, landmark: true, location: true } } },
             },
         },
         orderBy: [{ featuredOrder: 'asc' }, { updatedAt: 'desc' }],

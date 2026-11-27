@@ -23,10 +23,13 @@ import { authenticate, authorizeRoles } from '../../middlewares/auth.middleware'
 
 const router = Router();
 
+// Public global doctor directory & doctor details
+router.get('/', listGlobalDoctors);
+router.get('/:id', validate(getDoctorByIdSchema), getDoctorById);
+
+// Protected routes below
 router.use(authenticate);
 
-// Global doctor directory
-router.get('/', listGlobalDoctors);
 router.post('/', authorizeRoles('SUPER_ADMIN'), validate(createGlobalDoctorSchema), createGlobalDoctor);
 
 // Pharmacy-doctor assignment (declared before '/:id')
@@ -35,8 +38,7 @@ router.post('/onboard', authorizeRoles('SUPER_ADMIN'), validate(addDoctorSchema)
 router.post('/assign', authorizeRoles('SUPER_ADMIN', 'PHARMACY'), validate(assignDoctorSchema), assignDoctor);
 router.patch('/assign/:assignmentId/status', authorizeRoles('SUPER_ADMIN', 'PHARMACY'), validate(updateAssignmentStatusSchema), updateAssignmentStatus);
 
-// Single global doctor profile
-router.get('/:id', validate(getDoctorByIdSchema), getDoctorById);
+// Single global doctor profile update
 router.put('/:id', authorizeRoles('SUPER_ADMIN'), validate(updateGlobalDoctorSchema), updateGlobalDoctor);
 
 export default router;

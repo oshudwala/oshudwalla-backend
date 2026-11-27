@@ -22,6 +22,11 @@ export const getPharmacies = asyncHandler(async (req: AuthRequest, res: Response
     res.status(200).json(new ApiResponse(200, pharmacies, "Pharmacies retrieved successfully"));
 });
 
+export const getPrimaryPharmacy = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const primary = await pharmacyService.fetchPrimaryPharmacy();
+    res.status(200).json(new ApiResponse(200, primary, "Primary Pharmacy retrieved successfully"));
+});
+
 export const getMyPharmacies = asyncHandler(async (req: AuthRequest, res: Response) => {
     const data = await pharmacyService.fetchMyPharmacies(req.user!.userId);
     res.status(200).json(new ApiResponse(200, data, "Your pharmacies retrieved"));
@@ -90,4 +95,10 @@ export const updateReceptionistStatus = asyncHandler(async (req: AuthRequest, re
     const actor = { id: req.user!.userId, role: req.user!.role as RoleName };
     const data = await pharmacyService.setReceptionistStatus(req.params.id, req.params.staffId, req.body.isActive, actor);
     res.status(200).json(new ApiResponse(200, data, "Receptionist status updated successfully"));
+});
+
+export const deletePharmacy = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const actor = { id: req.user!.userId, role: req.user!.role as RoleName };
+    const data = await pharmacyService.removePharmacy(req.params.id, actor);
+    res.status(200).json(new ApiResponse(200, data, "Pharmacy and staff deleted successfully"));
 });

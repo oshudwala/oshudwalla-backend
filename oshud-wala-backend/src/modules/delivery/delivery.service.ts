@@ -10,6 +10,10 @@ export const assignDeliveries = async (riderId: string, orderIds: string[], acto
     return await repo.assignOrdersToRiderTx(riderId, uniqueOrderIds, actor);
 };
 
+export const getOrderPickupQr = async (orderId: string, actor: Actor) => {
+    return await repo.getOrderPickupQr(orderId, actor);
+};
+
 export const getMyDeliveries = async (riderId: string) => {
     return await repo.listRiderDeliveries(riderId);
 };

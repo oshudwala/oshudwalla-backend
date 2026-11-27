@@ -50,3 +50,40 @@ export const updateRiderStatus = async (userId: string, body: any, actor: Actor)
     if (body.kycStatus !== undefined) data.kycStatus = body.kycStatus;
     return await repo.updateRiderStatusTx(userId, existing, data, actor);
 };
+
+export const updateRider = async (id: string, body: any, actor: Actor) => {
+    const existing = await repo.findRiderByIdOrUserId(id);
+    if (!existing) throw new ApiError(404, 'Rider not found');
+
+    const profileData: any = {};
+    if (body.vehicleType !== undefined) profileData.vehicleType = body.vehicleType ? String(body.vehicleType).trim() : null;
+    if (body.vehicleNumber !== undefined) profileData.vehicleNumber = body.vehicleNumber ? String(body.vehicleNumber).trim() : null;
+    if (body.licenseNumber !== undefined) profileData.licenseNumber = body.licenseNumber ? String(body.licenseNumber).trim() : null;
+    if (body.status !== undefined) profileData.status = body.status;
+    if (body.kycStatus !== undefined) profileData.kycStatus = body.kycStatus;
+
+    const userData: any = {};
+    if (body.fullName !== undefined) userData.fullName = String(body.fullName).trim();
+    if (body.phone !== undefined) {
+        const cleanPhone = String(body.phone).replace(/[^0-9]/g, '');
+        if (cleanPhone && cleanPhone !== existing.user?.phone) {
+            const conflict = await repo.findUserByPhoneOrEmail(cleanPhone, '');
+            if (conflict && conflict.id !== existing.userId) {
+                throw new ApiError(409, 'Phone number is already registered to another account');
+            }
+        }
+        userData.phone = cleanPhone;
+    }
+    if (body.email !== undefined) {
+        const cleanEmail = body.email ? String(body.email).trim().toLowerCase() : null;
+        if (cleanEmail && cleanEmail !== existing.user?.email) {
+            const conflict = await repo.findUserByPhoneOrEmail('', cleanEmail);
+            if (conflict && conflict.id !== existing.userId) {
+                throw new ApiError(409, 'Email address is already registered to another account');
+            }
+        }
+        userData.email = cleanEmail;
+    }
+
+    return await repo.updateRiderTx(id, profileData, userData, actor);
+};

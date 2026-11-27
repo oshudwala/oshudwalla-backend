@@ -1,6 +1,7 @@
 import { RoleName } from '@prisma/client';
 import { ApiError } from '../../utils/apiError';
 import * as doctorRepo from './doctor.repository';
+import { prisma } from '../../config/prisma';
 
 type Actor = { id: string; role: RoleName };
 
@@ -75,6 +76,9 @@ export const updateGlobalDoctor = async (id: string, body: any, actor: Actor) =>
 
     const data: any = {};
     if (body.fullName !== undefined) data.fullName = String(body.fullName).trim();
+    if (body.phone !== undefined) data.phone = body.phone ? String(body.phone).trim() : null;
+    if (body.email !== undefined) data.email = body.email ? String(body.email).trim().toLowerCase() : null;
+    if (body.registrationNumber !== undefined) data.registrationNumber = body.registrationNumber ? String(body.registrationNumber).trim() : null;
     if (body.qualifications !== undefined) data.qualifications = body.qualifications ? String(body.qualifications).trim() : null;
     if (body.experienceYears !== undefined) data.experienceYears = body.experienceYears;
     if (body.bio !== undefined) data.bio = body.bio ? String(body.bio).trim() : null;
@@ -82,9 +86,24 @@ export const updateGlobalDoctor = async (id: string, body: any, actor: Actor) =>
     if (body.isVerified !== undefined) data.isVerified = body.isVerified;
     if (body.isFeatured !== undefined) data.isFeatured = body.isFeatured;
 
+    // Check duplicate phone/email if changed
+    if (data.phone && data.phone !== existing.phone) {
+        const phoneConflict = await prisma.user.findFirst({
+            where: { phone: data.phone, NOT: existing.userId ? { id: existing.userId } : undefined }
+        });
+        if (phoneConflict) throw new ApiError(409, "Phone number is already in use by another account");
+    }
+    if (data.email && data.email !== existing.email) {
+        const emailConflict = await prisma.user.findFirst({
+            where: { email: data.email, NOT: existing.userId ? { id: existing.userId } : undefined }
+        });
+        if (emailConflict) throw new ApiError(409, "Email address is already in use by another account");
+    }
+
     try {
         return await doctorRepo.updateGlobalDoctorWithAudit(id, existing, data, uniqueSpecIds, actor);
     } catch (error: any) {
+        if (error instanceof ApiError) throw error;
         console.error('Update global doctor error:', error);
         throw new ApiError(500, 'Failed to update doctor');
     }

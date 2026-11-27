@@ -10,16 +10,20 @@ export const prescriptionCleanupQueue = new Queue('prescription-cleanup', {
 
 export const schedulePrescriptionImageCleanup = async (prescriptionId: string, storageKeys: string[]) => {
     if (storageKeys.length === 0) return;
-    await prescriptionCleanupQueue.add(
-        'delete-cloudinary-images',
-        { prescriptionId, storageKeys },
-        {
-            delay: PRESCRIPTION_CLEANUP_DELAY_MS,
-            attempts: 3,
-            backoff: { type: 'exponential', delay: 60000 },
-            removeOnComplete: true,
-        }
-    );
+    try {
+        await prescriptionCleanupQueue.add(
+            'delete-cloudinary-images',
+            { prescriptionId, storageKeys },
+            {
+                delay: PRESCRIPTION_CLEANUP_DELAY_MS,
+                attempts: 3,
+                backoff: { type: 'exponential', delay: 60000 },
+                removeOnComplete: true,
+            }
+        );
+    } catch (e) {
+        console.warn('BullMQ prescription cleanup queue warning:', (e as any)?.message || e);
+    }
 };
 
 // Only start background worker outside Jest test runs

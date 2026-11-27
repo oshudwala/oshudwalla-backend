@@ -2,6 +2,7 @@ import bcrypt from 'bcrypt';
 import { RoleName } from '@prisma/client';
 import { ApiError } from '../../utils/apiError';
 import * as pharmacyRepo from './pharmacy.repository';
+import { prisma } from '../../config/prisma';
 
 type Actor = { id: string; role: RoleName };
 
@@ -83,6 +84,10 @@ export const fetchPharmacies = async () => {
     return await pharmacyRepo.getAllPharmacies();
 };
 
+export const fetchPrimaryPharmacy = async () => {
+    return await pharmacyRepo.getPrimaryPharmacy();
+};
+
 export const fetchMyPharmacies = async (userId: string) => {
     return await pharmacyRepo.findPharmaciesByStaffUser(userId);
 };
@@ -94,23 +99,53 @@ export const updatePharmacy = async (id: string, body: any, actor: Actor) => {
     if (!existing) throw new ApiError(404, 'Pharmacy not found');
     if (existing.status !== 'ACTIVE') throw new ApiError(400, 'Pharmacy is not ACTIVE');
 
-    // Super Admin can edit any pharmacy. A PHARMACY user can edit only the pharmacy where they are an active OWNER.
-    // explicit whitelist: status, isPrimary, city, locationId and anything else in the body are ignored
     const data: any = {};
     if (body.name !== undefined) data.name = String(body.name).trim();
     if (body.nameBn !== undefined) data.nameBn = body.nameBn ? String(body.nameBn).trim() : null;
     if (body.nameHi !== undefined) data.nameHi = body.nameHi ? String(body.nameHi).trim() : null;
     if (body.phone !== undefined) data.phone = String(body.phone).trim();
+    if (body.email !== undefined) data.email = body.email ? String(body.email).trim().toLowerCase() : null;
     if (body.line1 !== undefined) data.line1 = String(body.line1).trim();
     if (body.line2 !== undefined) data.line2 = body.line2 ? String(body.line2).trim() : null;
+    if (body.city !== undefined) data.city = String(body.city).trim();
+    if (body.state !== undefined) data.state = String(body.state).trim();
+    if (body.pincode !== undefined) data.pincode = String(body.pincode).trim();
+    if (body.licenseNumber !== undefined) data.licenseNumber = body.licenseNumber ? String(body.licenseNumber).trim() : null;
+    if (body.logoUrl !== undefined) data.logoUrl = body.logoUrl ? String(body.logoUrl).trim() : null;
+    if (body.hasClinicService !== undefined) data.hasClinicService = Boolean(body.hasClinicService);
+    if (body.hasMedicineService !== undefined) data.hasMedicineService = Boolean(body.hasMedicineService);
+    if (body.isFeatured !== undefined) data.isFeatured = Boolean(body.isFeatured);
+    if (body.locationId !== undefined) data.locationId = body.locationId;
     if (body.latitude !== undefined) {
         data.latitude = body.latitude;
         data.longitude = body.longitude;
     }
 
+    // Find linked owner/staff to also update their User record
+    const ownerStaff = await prisma.pharmacyStaff.findFirst({
+        where: { pharmacyId: id, staffRole: { in: ['OWNER', 'RECEPTIONIST'] }, isActive: true },
+        select: { userId: true },
+    });
+    const ownerUserId = ownerStaff?.userId;
+
+    if (data.phone && ownerUserId) {
+        const phoneConflict = await prisma.user.findFirst({
+            where: { phone: data.phone, NOT: { id: ownerUserId } },
+        });
+        if (phoneConflict) throw new ApiError(409, "Phone number is already in use by another account");
+    }
+
+    if (data.email && ownerUserId) {
+        const emailConflict = await prisma.user.findFirst({
+            where: { email: data.email, NOT: { id: ownerUserId } },
+        });
+        if (emailConflict) throw new ApiError(409, "Email address is already in use by another account");
+    }
+
     try {
-        return await pharmacyRepo.updatePharmacyWithAudit(id, existing, data, actor);
+        return await pharmacyRepo.updatePharmacyWithAudit(id, existing, data, actor, 'PHARMACY_UPDATED', ownerUserId);
     } catch (error: any) {
+        if (error instanceof ApiError) throw error;
         console.error('Update pharmacy error:', error);
         throw new ApiError(500, 'Failed to update pharmacy');
     }
@@ -318,3 +353,8 @@ export const setReceptionistStatus = async (pharmacyId: string, staffId: string,
         throw new ApiError(500, 'Failed to update receptionist status');
     }
 };
+
+export const removePharmacy = async (pharmacyId: string, actor: Actor) => {
+    return await pharmacyRepo.deletePharmacyAndStaff(pharmacyId, actor);
+};
+

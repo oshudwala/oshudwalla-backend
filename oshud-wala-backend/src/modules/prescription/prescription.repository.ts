@@ -6,11 +6,39 @@ type Actor = { id: string; role: RoleName };
 
 export const findPharmacyById = (id: string) => prisma.pharmacy.findUnique({ where: { id } });
 
-export const findPrimaryMedicinePharmacy = () =>
-    prisma.pharmacy.findFirst({ where: { isPrimary: true, status: 'ACTIVE', hasMedicineService: true } });
+export const findPrimaryMedicinePharmacy = async () => {
+    const primary = await prisma.pharmacy.findFirst({
+        where: { isPrimary: true, status: 'ACTIVE' },
+    });
+    if (primary) return primary;
+    const medicinePh = await prisma.pharmacy.findFirst({
+        where: { status: 'ACTIVE', hasMedicineService: true },
+    });
+    if (medicinePh) return medicinePh;
+    return await prisma.pharmacy.findFirst({
+        where: { status: 'ACTIVE' },
+    });
+};
+
+export const findStaffPharmacyByUserId = (userId: string) =>
+    prisma.pharmacyStaff.findFirst({
+        where: { userId },
+        select: { pharmacyId: true, isActive: true },
+        orderBy: { createdAt: 'desc' },
+    });
+
+export const listAllPrescriptions = () =>
+    prisma.prescription.findMany({
+        orderBy: { createdAt: 'desc' },
+        include: {
+            files: true,
+            patient: { select: { id: true, fullName: true, phone: true } },
+            pharmacy: { select: { id: true, name: true } },
+        },
+    });
 
 export const findActiveOwnerLink = (userId: string, pharmacyId: string) =>
-    prisma.pharmacyStaff.findFirst({ where: { userId, pharmacyId, staffRole: 'OWNER', isActive: true } });
+    prisma.pharmacyStaff.findFirst({ where: { userId, pharmacyId, isActive: true } });
 
 export const findPrescriptionById = (id: string) =>
     prisma.prescription.findUnique({

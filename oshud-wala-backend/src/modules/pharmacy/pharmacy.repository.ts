@@ -97,8 +97,21 @@ export const setPrimaryPharmacy = async (pharmacyId: string) => {
         // 2. Set the new primary pharmacy
         return await tx.pharmacy.update({
             where: { id: pharmacyId },
-            data: { isPrimary: true }
+            data: { isPrimary: true, hasMedicineService: true },
+            include: { location: locationSelect }
         });
+    });
+};
+
+export const getPrimaryPharmacy = async () => {
+    const primary = await prisma.pharmacy.findFirst({
+        where: { isPrimary: true, status: 'ACTIVE' },
+        include: { location: locationSelect }
+    });
+    if (primary) return primary;
+    return await prisma.pharmacy.findFirst({
+        where: { status: 'ACTIVE', hasMedicineService: true },
+        include: { location: locationSelect }
     });
 };
 
@@ -124,10 +137,24 @@ export const findPharmacyById = (id: string) => prisma.pharmacy.findUnique({ whe
 export const findActiveOwnerLink = (userId: string, pharmacyId: string) =>
     prisma.pharmacyStaff.findFirst({ where: { userId, pharmacyId, staffRole: 'OWNER', isActive: true } });
 
-export const updatePharmacyWithAudit = (id: string, before: any, data: any, actor: Actor, action = 'PHARMACY_UPDATED') =>
+export const updatePharmacyWithAudit = (id: string, before: any, data: any, actor: Actor, action = 'PHARMACY_UPDATED', ownerUserId?: string) =>
     prisma.$transaction(
         async (tx) => {
             const updated = await tx.pharmacy.update({ where: { id }, data, include: { location: locationSelect } });
+
+            if (ownerUserId) {
+                const userUpdate: any = {};
+                if (data.name) userUpdate.fullName = data.name;
+                if (data.phone) userUpdate.phone = data.phone;
+                if (data.email !== undefined) userUpdate.email = data.email;
+                if (Object.keys(userUpdate).length > 0) {
+                    await tx.user.update({
+                        where: { id: ownerUserId },
+                        data: userUpdate,
+                    });
+                }
+            }
+
             await tx.auditLog.create({
                 data: {
                     actorId: actor.id,
@@ -325,4 +352,130 @@ export const updateReceptionistStatusWithAudit = (staff: any, isActive: boolean,
             return updated;
         },
         { maxWait: 10000, timeout: 30000 }
+    );
+
+export const deletePharmacyAndStaff = async (pharmacyId: string, actor: Actor) =>
+    prisma.$transaction(
+        async (tx) => {
+            const pharmacy = await tx.pharmacy.findUnique({
+                where: { id: pharmacyId },
+                include: { staff: true },
+            });
+            if (!pharmacy) throw new ApiError(404, 'Pharmacy or clinic not found');
+
+            const staffUserIds = pharmacy.staff.map((s) => s.userId);
+
+            // 1. Clean up orders referencing this pharmacy
+            const fallback = await tx.pharmacy.findFirst({ where: { isPrimary: true, NOT: { id: pharmacyId } } });
+            if (fallback) {
+                await tx.order.updateMany({
+                    where: { pharmacyId },
+                    data: { pharmacyId: fallback.id },
+                });
+            } else {
+                await tx.order.deleteMany({
+                    where: { pharmacyId },
+                });
+            }
+
+            // 2. Clean up prescriptions referencing this pharmacy
+            await tx.prescription.updateMany({
+                where: { pharmacyId },
+                data: { pharmacyId: null },
+            });
+
+            // 3. Delete pickup QR codes
+            await tx.pickupQr.deleteMany({
+                where: { pharmacyId },
+            });
+
+            // 4. Delete commission rules
+            await tx.commissionRule.deleteMany({
+                where: { pharmacyId },
+            });
+
+            // 5. Delete reviews
+            await tx.review.deleteMany({
+                where: { pharmacyId },
+            });
+
+            // 6. Delete opening hours and holidays
+            await tx.pharmacyOpeningHour.deleteMany({
+                where: { pharmacyId },
+            });
+            await tx.pharmacyHoliday.deleteMany({
+                where: { pharmacyId },
+            });
+
+            // 7. Delete pharmacy doctors & their appointments/schedules
+            const pdRows = await tx.pharmacyDoctor.findMany({
+                where: { pharmacyId },
+                select: { id: true },
+            });
+            for (const pd of pdRows) {
+                await tx.appointmentSlot.deleteMany({ where: { pharmacyDoctorId: pd.id } });
+                await tx.appointment.deleteMany({ where: { pharmacyDoctorId: pd.id } });
+                await tx.queueDay.deleteMany({ where: { pharmacyDoctorId: pd.id } });
+                await tx.doctorSchedule.deleteMany({ where: { pharmacyDoctorId: pd.id } });
+                await tx.scheduleException.deleteMany({ where: { pharmacyDoctorId: pd.id } });
+                await tx.receptionistDoctor.deleteMany({ where: { pharmacyDoctorId: pd.id } });
+            }
+            await tx.pharmacyDoctor.deleteMany({ where: { pharmacyId } });
+
+            // 8. Delete pharmacy wallet & ledger entries
+            const pWallet = await tx.wallet.findUnique({ where: { pharmacyId } });
+            if (pWallet) {
+                await tx.ledgerEntry.deleteMany({ where: { walletId: pWallet.id } });
+                await tx.withdrawalRequest.deleteMany({ where: { walletId: pWallet.id } });
+                await tx.wallet.delete({ where: { id: pWallet.id } });
+            }
+
+            // 9. Delete staff links
+            await tx.pharmacyStaff.deleteMany({ where: { pharmacyId } });
+
+            // 10. Delete the pharmacy from pharmacies table
+            await tx.pharmacy.delete({ where: { id: pharmacyId } });
+
+            // 11. Delete associated users from users table
+            for (const userId of staffUserIds) {
+                const uWallets = await tx.wallet.findMany({ where: { userId } });
+                for (const uw of uWallets) {
+                    await tx.ledgerEntry.deleteMany({ where: { walletId: uw.id } });
+                    await tx.withdrawalRequest.deleteMany({ where: { walletId: uw.id } });
+                    await tx.wallet.delete({ where: { id: uw.id } });
+                }
+
+                await tx.session.deleteMany({ where: { userId } });
+                await tx.passwordResetToken.deleteMany({ where: { userId } });
+                await tx.patientProfile.deleteMany({ where: { userId } });
+                await tx.address.deleteMany({ where: { userId } });
+                await tx.notification.deleteMany({ where: { userId } });
+                await tx.notificationSetting.deleteMany({ where: { userId } });
+                await tx.notificationPreference.deleteMany({ where: { userId } });
+                await tx.deviceToken.deleteMany({ where: { userId } });
+                await tx.receptionistDoctor.deleteMany({ where: { receptionistUserId: userId } });
+                await tx.auditLog.updateMany({ where: { actorId: userId }, data: { actorId: null } });
+
+                try {
+                    await tx.user.delete({ where: { id: userId } });
+                } catch (delUserErr) {
+                    console.warn(`User ${userId} delete notice:`, delUserErr);
+                }
+            }
+
+            // 12. Create audit log
+            await tx.auditLog.create({
+                data: {
+                    actorId: actor.id,
+                    actorRole: actor.role,
+                    action: 'PHARMACY_DELETED',
+                    entityType: 'Pharmacy',
+                    entityId: pharmacyId,
+                    before: pharmacy as any,
+                },
+            });
+
+            return { id: pharmacyId, deletedStaffUsers: staffUserIds };
+        },
+        { maxWait: 15000, timeout: 45000 }
     );

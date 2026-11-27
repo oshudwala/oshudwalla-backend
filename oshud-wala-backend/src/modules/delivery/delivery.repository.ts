@@ -8,16 +8,27 @@ type Actor = { id: string; role: RoleName };
 
 const RIDER_EARNING_PAISE = Number(process.env.RIDER_EARNING_PAISE || 4000); // ₹40
 
+interface ActivePickupQrInfo {
+    qrToken: string;
+    expiresAt: Date;
+    batchId: string;
+    pharmacyId: string;
+    riderId: string;
+    orderIds: string[];
+}
+const activePickupQrCache = new Map<string, ActivePickupQrInfo>();
+
 export const assignOrdersToRiderTx = (riderId: string, orderIds: string[], actor: Actor) =>
     prisma.$transaction(
         async (tx) => {
-            const riderProfile = await tx.riderProfile.findUnique({
-                where: { userId: riderId },
+            const riderProfile = await tx.riderProfile.findFirst({
+                where: { OR: [{ userId: riderId }, { id: riderId }] },
                 include: { user: { select: { id: true, status: true } } },
             });
             if (!riderProfile || riderProfile.user.status !== 'ACTIVE' || riderProfile.status === 'SUSPENDED') {
                 throw new ApiError(404, 'Active rider not found');
             }
+            const targetUserId = riderProfile.userId;
 
             const orders = await tx.order.findMany({ where: { id: { in: orderIds } } });
             if (orders.length !== orderIds.length) {
@@ -30,7 +41,7 @@ export const assignOrdersToRiderTx = (riderId: string, orderIds: string[], actor
             }
 
             const batch = await tx.deliveryBatch.create({
-                data: { riderId, assignedById: actor.id },
+                data: { riderId: targetUserId, assignedById: actor.id },
             });
 
             const deliveries = [];
@@ -39,14 +50,14 @@ export const assignOrdersToRiderTx = (riderId: string, orderIds: string[], actor
                     data: {
                         orderId: o.id,
                         batchId: batch.id,
-                        riderId,
+                        riderId: targetUserId,
                         assignedById: actor.id,
                         status: 'ASSIGNED',
                         history: {
                             create: {
                                 fromStatus: null,
                                 toStatus: 'ASSIGNED',
-                                riderId,
+                                riderId: targetUserId,
                                 actorId: actor.id,
                             },
                         },
@@ -64,6 +75,36 @@ export const assignOrdersToRiderTx = (riderId: string, orderIds: string[], actor
                         actorRole: actor.role,
                     },
                 });
+
+                // Original in-app notification for the assigned Rider
+                await tx.notification.create({
+                    data: {
+                        userId: riderId,
+                        category: 'DELIVERY',
+                        eventType: 'ORDER_ASSIGNED_TO_RIDER',
+                        title: 'New Order Delivery Assigned',
+                        body: `Order ${o.orderNumber || o.id} assigned to you. Single-use pickup QR is ready at pharmacy counter.`,
+                        data: { link: '/rider/deliveries', orderId: o.id },
+                        priority: 'HIGH',
+                        dedupeKey: `notif_assign_${o.id}_${riderId}_${Date.now()}`,
+                    },
+                }).catch(() => {});
+
+                // Original in-app notification for Patient
+                if (o.patientId) {
+                    await tx.notification.create({
+                        data: {
+                            userId: o.patientId,
+                            category: 'DELIVERY',
+                            eventType: 'RIDER_ASSIGNED_TO_ORDER',
+                            title: 'Rider Assigned to Your Order',
+                            body: `A delivery rider has been assigned to order ${o.orderNumber || o.id}.`,
+                            data: { link: '/orders', orderId: o.id },
+                            priority: 'NORMAL',
+                            dedupeKey: `notif_pat_assign_${o.id}_${Date.now()}`,
+                        },
+                    }).catch(() => {});
+                }
             }
 
             // Generate one single-use Pickup QR per unique pharmacy in this batch
@@ -83,6 +124,21 @@ export const assignOrdersToRiderTx = (riderId: string, orderIds: string[], actor
                     },
                 });
                 pickupQrs.push({ id: qr.id, pharmacyId, qrToken: rawToken, expiresAt });
+
+                // Cache active pickup QR by order IDs, batch ID, and token for instant retrieval
+                const qrInfo: ActivePickupQrInfo = {
+                    qrToken: rawToken,
+                    expiresAt,
+                    batchId: batch.id,
+                    pharmacyId,
+                    riderId,
+                    orderIds,
+                };
+                for (const o of orders) {
+                    activePickupQrCache.set(o.id, qrInfo);
+                }
+                activePickupQrCache.set(batch.id, qrInfo);
+                activePickupQrCache.set(rawToken, qrInfo);
             }
 
             await tx.auditLog.create({
@@ -101,9 +157,14 @@ export const assignOrdersToRiderTx = (riderId: string, orderIds: string[], actor
         { maxWait: 10000, timeout: 30000 }
     );
 
-export const listRiderDeliveries = (riderId: string) =>
-    prisma.delivery.findMany({
-        where: { riderId },
+export const listRiderDeliveries = async (riderId: string) => {
+    const profile = await prisma.riderProfile.findFirst({
+        where: { OR: [{ userId: riderId }, { id: riderId }] },
+    });
+    const targetUserId = profile?.userId || riderId;
+
+    return prisma.delivery.findMany({
+        where: { OR: [{ riderId: targetUserId }, { riderId }] },
         orderBy: { assignedAt: 'desc' },
         include: {
             order: {
@@ -111,54 +172,310 @@ export const listRiderDeliveries = (riderId: string) =>
                     id: true,
                     orderNumber: true,
                     status: true,
+                    subtotalPaise: true,
+                    deliveryFeePaise: true,
                     totalPaise: true,
+                    paymentMethod: true,
+                    paymentStatus: true,
                     deliveryAddress: true,
+                    items: {
+                        select: {
+                            id: true,
+                            nameSnapshot: true,
+                            quantity: true,
+                            mrpPaise: true,
+                            unitPricePaise: true,
+                            lineTotalPaise: true,
+                            requiresPrescription: true,
+                        },
+                    },
                     pharmacy: { select: { id: true, name: true, line1: true, phone: true } },
                 },
             },
         },
     });
+};
+
+export const getOrderPickupQr = async (orderId: string, actor: Actor) => {
+    const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+            items: true,
+            delivery: {
+                include: {
+                    rider: {
+                        select: { id: true, fullName: true, phone: true },
+                    },
+                    batch: true,
+                },
+            },
+        },
+    });
+
+    if (!order) {
+        throw new ApiError(404, 'Order not found');
+    }
+
+    if (!order.delivery || !order.delivery.riderId) {
+        throw new ApiError(400, 'No delivery rider has been assigned by Admin to this order yet. Authentic QR code can only be generated after rider assignment.');
+    }
+
+    let cached = activePickupQrCache.get(orderId);
+    if (!cached && order.delivery?.batchId) {
+        cached = activePickupQrCache.get(order.delivery.batchId);
+    }
+
+    let token = cached?.qrToken;
+    let expiresAt = cached?.expiresAt || new Date(Date.now() + 15 * 60 * 1000);
+
+    if (!token) {
+        token = `QR-${order.delivery.batchId || order.id}-${crypto.randomBytes(16).toString('hex')}`;
+        const tokenHash = sha256Hex(token);
+        expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+        if (order.delivery.batchId) {
+            const existingQr = await prisma.pickupQr.findFirst({
+                where: { batchId: order.delivery.batchId, pharmacyId: order.pharmacyId, status: 'ACTIVE' },
+            });
+            if (existingQr) {
+                await prisma.pickupQr.update({
+                    where: { id: existingQr.id },
+                    data: { tokenHash, expiresAt },
+                });
+            } else {
+                await prisma.pickupQr.create({
+                    data: {
+                        batchId: order.delivery.batchId,
+                        pharmacyId: order.pharmacyId,
+                        tokenHash,
+                        status: 'ACTIVE',
+                        expiresAt,
+                    },
+                });
+            }
+        }
+
+        const qrInfo: ActivePickupQrInfo = {
+            qrToken: token,
+            expiresAt,
+            batchId: order.delivery.batchId || order.id,
+            pharmacyId: order.pharmacyId,
+            riderId: order.delivery.riderId,
+            orderIds: [orderId],
+        };
+        activePickupQrCache.set(orderId, qrInfo);
+        if (order.delivery.batchId) activePickupQrCache.set(order.delivery.batchId, qrInfo);
+        activePickupQrCache.set(token, qrInfo);
+    }
+
+    return {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        qrToken: token,
+        expiresAt,
+        durationMinutes: 15,
+        assignedRider: (order as any).delivery?.rider
+            ? {
+                  id: (order as any).delivery.rider.id,
+                  name: (order as any).delivery.rider.fullName || (order as any).delivery.rider.name || 'Assigned Rider',
+                  phone: (order as any).delivery.rider.phone,
+              }
+            : null,
+        items: order.items.map((i) => ({
+            name: i.nameSnapshot,
+            quantity: i.quantity,
+            mrpPaise: i.mrpPaise,
+        })),
+    };
+};
 
 export const scanPickupQrTx = (qrToken: string, riderId: string, actor: Actor) =>
     prisma.$transaction(
         async (tx) => {
-            const tokenHash = sha256Hex(qrToken);
-            const qr = await tx.pickupQr.findUnique({
+            let cleanToken = (qrToken || '').trim();
+            let extractedOrderId: string | null = null;
+            try {
+                const parsed = JSON.parse(qrToken);
+                if (parsed.qrToken) cleanToken = String(parsed.qrToken).trim();
+                else if (parsed.token) cleanToken = String(parsed.token).trim();
+                if (parsed.orderId) extractedOrderId = String(parsed.orderId).trim();
+            } catch {}
+
+            const riderProfile = await tx.riderProfile.findFirst({
+                where: { OR: [{ userId: riderId }, { id: riderId }] },
+            });
+            const actualUserId = riderProfile?.userId || riderId;
+
+            const tokenHash = sha256Hex(cleanToken);
+            let qr = await tx.pickupQr.findUnique({
                 where: { tokenHash },
                 include: { batch: true },
             });
-            if (!qr) throw new ApiError(404, 'Invalid pickup QR');
-            if (qr.status !== 'ACTIVE') throw new ApiError(400, `Pickup QR is already ${qr.status}`);
-            if (qr.expiresAt < new Date()) throw new ApiError(400, 'Pickup QR has expired');
-            if (qr.batch.riderId !== riderId) throw new ApiError(403, 'This pickup QR is assigned to a different rider');
 
-            // Atomically consume single-use QR
-            const consumed = await tx.pickupQr.updateMany({
-                where: { id: qr.id, status: 'ACTIVE' },
-                data: { status: 'USED', usedAt: new Date(), usedByRiderId: riderId },
-            });
-            if (consumed.count === 0) throw new ApiError(400, 'Pickup QR was already used');
+            const cached = activePickupQrCache.get(cleanToken) || (extractedOrderId ? activePickupQrCache.get(extractedOrderId) : undefined);
 
-            const deliveries = await tx.delivery.findMany({
-                where: { batchId: qr.batchId, order: { pharmacyId: qr.pharmacyId } },
-            });
-
-            const now = new Date();
-            for (const d of deliveries) {
-                await tx.delivery.update({
-                    where: { id: d.id },
-                    data: { status: 'PICKED_UP', pickedUpAt: now, shippedAt: now },
+            if (!qr && !cached) {
+                // Check if cleanToken is directly an order ID, orderNumber, or batch ID
+                const orderMatch = await tx.order.findFirst({
+                    where: { OR: [{ id: cleanToken }, { orderNumber: cleanToken }] },
+                    include: { delivery: true },
                 });
-                await tx.deliveryStatusHistory.create({
-                    data: { deliveryId: d.id, fromStatus: d.status, toStatus: 'PICKED_UP', riderId, actorId: actor.id },
-                });
-                await tx.order.update({ where: { id: d.orderId }, data: { status: 'SHIPPED' } });
-                await tx.orderStatusHistory.create({
-                    data: { orderId: d.orderId, fromStatus: 'RIDER_ASSIGNED', toStatus: 'SHIPPED', actorId: actor.id, actorRole: actor.role },
-                });
+                if (orderMatch && orderMatch.delivery?.batchId) {
+                    qr = await tx.pickupQr.findFirst({
+                        where: { batchId: orderMatch.delivery.batchId, status: 'ACTIVE' },
+                        include: { batch: true },
+                    });
+                }
             }
 
-            return { batchId: qr.batchId, pickedUpCount: deliveries.length };
+            if (!qr && !cached) {
+                throw new ApiError(404, 'Invalid pickup QR. No matching parcel found.');
+            }
+
+            if (qr) {
+                if (qr.status !== 'ACTIVE') throw new ApiError(400, `Pickup QR is already ${qr.status}`);
+                if (qr.expiresAt < new Date()) throw new ApiError(400, 'Pickup QR has expired');
+
+                // Strictly authenticate rider
+                const designatedRiderId = qr.batch.riderId;
+                const isAuthorized = designatedRiderId === riderId || designatedRiderId === actualUserId || designatedRiderId === riderProfile?.id;
+                if (!isAuthorized) {
+                    throw new ApiError(403, 'Verification Denied: This pickup QR code is assigned to a different delivery partner. You do not have permission to verify or view this order.');
+                }
+
+                // Atomically consume single-use QR
+                const consumed = await tx.pickupQr.updateMany({
+                    where: { id: qr.id, status: 'ACTIVE' },
+                    data: { status: 'USED', usedAt: new Date(), usedByRiderId: actualUserId },
+                });
+                if (consumed.count === 0) throw new ApiError(400, 'Pickup QR was already used');
+
+                const deliveries = await tx.delivery.findMany({
+                    where: { batchId: qr.batchId, order: { pharmacyId: qr.pharmacyId } },
+                    include: {
+                        order: {
+                            include: {
+                                items: true,
+                                pharmacy: { select: { id: true, name: true, phone: true, line1: true } },
+                                patient: { select: { fullName: true, phone: true } },
+                            },
+                        },
+                    },
+                });
+
+                const now = new Date();
+                for (const d of deliveries) {
+                    await tx.delivery.update({
+                        where: { id: d.id },
+                        data: { status: 'PICKED_UP', pickedUpAt: now, shippedAt: now },
+                    });
+                    await tx.deliveryStatusHistory.create({
+                        data: { deliveryId: d.id, fromStatus: d.status, toStatus: 'PICKED_UP', riderId: actualUserId, actorId: actor.id },
+                    });
+                    await tx.order.update({ where: { id: d.orderId }, data: { status: 'OUT_FOR_DELIVERY' } });
+                    await tx.orderStatusHistory.create({
+                        data: { orderId: d.orderId, fromStatus: 'RIDER_ASSIGNED', toStatus: 'OUT_FOR_DELIVERY', actorId: actor.id, actorRole: actor.role },
+                    });
+                }
+
+                activePickupQrCache.delete(cleanToken);
+                activePickupQrCache.delete(qrToken);
+
+                return {
+                    success: true,
+                    verified: true,
+                    batchId: qr.batchId,
+                    pickedUpCount: deliveries.length,
+                    orders: deliveries.map((d) => ({
+                        id: d.order.id,
+                        orderNumber: d.order.orderNumber,
+                        status: 'OUT_FOR_DELIVERY',
+                        totalAmount: Number(d.order.totalPaise || 0) / 100,
+                        paymentMethod: d.order.paymentMethod,
+                        paymentStatus: d.order.paymentStatus,
+                        customerName: (d.order.deliveryAddress as any)?.fullName || d.order.patient?.fullName || 'Customer',
+                        customerPhone: (d.order.deliveryAddress as any)?.phone || d.order.patient?.phone || '',
+                        deliveryAddress: [(d.order.deliveryAddress as any)?.line1, (d.order.deliveryAddress as any)?.area, (d.order.deliveryAddress as any)?.city, (d.order.deliveryAddress as any)?.pincode].filter(Boolean).join(', '),
+                        area: (d.order.deliveryAddress as any)?.area || 'Kolkata Central',
+                        pharmacyName: d.order.pharmacy?.name || 'Fulfillment Pharmacy',
+                        pharmacyPhone: d.order.pharmacy?.phone || '',
+                        pharmacyAddress: d.order.pharmacy?.line1 || 'Dispensary Hub',
+                        items: d.order.items.map((it) => ({
+                            id: it.id,
+                            name: it.nameSnapshot,
+                            quantity: it.quantity,
+                            unitPrice: Number(it.unitPricePaise || it.mrpPaise || 0) / 100,
+                            lineTotal: Number(it.lineTotalPaise || 0) / 100,
+                            requiresPrescription: it.requiresPrescription,
+                        })),
+                    })),
+                };
+            }
+
+            // Fallback for cache-matched token
+            if (cached) {
+                if (cached.expiresAt < new Date()) throw new ApiError(400, 'Pickup QR has expired');
+                const isAuthorized = !cached.riderId || cached.riderId === riderId || cached.riderId === actualUserId || cached.riderId === riderProfile?.id;
+                if (!isAuthorized) {
+                    throw new ApiError(403, 'Verification Denied: This pickup QR code is assigned to a different delivery partner. You do not have permission to verify or view this order.');
+                }
+
+                const now = new Date();
+                const updatedOrders = [];
+                for (const oId of cached.orderIds) {
+                    const ord = await tx.order.update({
+                        where: { id: oId },
+                        data: { status: 'OUT_FOR_DELIVERY' },
+                        include: {
+                            items: true,
+                            pharmacy: { select: { id: true, name: true, phone: true, line1: true } },
+                            patient: { select: { fullName: true, phone: true } },
+                        },
+                    }).catch(() => null);
+
+                    await tx.delivery.updateMany({
+                        where: { orderId: oId },
+                        data: { status: 'PICKED_UP', pickedUpAt: now, shippedAt: now },
+                    }).catch(() => {});
+
+                    if (ord) updatedOrders.push(ord);
+                }
+
+                activePickupQrCache.delete(cleanToken);
+                activePickupQrCache.delete(qrToken);
+
+                return {
+                    success: true,
+                    verified: true,
+                    batchId: cached.batchId,
+                    pickedUpCount: updatedOrders.length,
+                    orders: updatedOrders.map((o) => ({
+                        id: o.id,
+                        orderNumber: o.orderNumber,
+                        status: 'OUT_FOR_DELIVERY',
+                        totalAmount: Number(o.totalPaise || 0) / 100,
+                        paymentMethod: o.paymentMethod,
+                        paymentStatus: o.paymentStatus,
+                        customerName: (o.deliveryAddress as any)?.fullName || o.patient?.fullName || 'Customer',
+                        customerPhone: (o.deliveryAddress as any)?.phone || o.patient?.phone || '',
+                        deliveryAddress: [(o.deliveryAddress as any)?.line1, (o.deliveryAddress as any)?.area, (o.deliveryAddress as any)?.city, (o.deliveryAddress as any)?.pincode].filter(Boolean).join(', '),
+                        area: (o.deliveryAddress as any)?.area || 'Kolkata Central',
+                        pharmacyName: o.pharmacy?.name || 'Fulfillment Pharmacy',
+                        pharmacyPhone: o.pharmacy?.phone || '',
+                        pharmacyAddress: o.pharmacy?.line1 || 'Dispensary Hub',
+                        items: o.items.map((it: any) => ({
+                            id: it.id,
+                            name: it.nameSnapshot,
+                            quantity: it.quantity,
+                            unitPrice: Number(it.unitPricePaise || it.mrpPaise || 0) / 100,
+                            lineTotal: Number(it.lineTotalPaise || 0) / 100,
+                            requiresPrescription: it.requiresPrescription,
+                        })),
+                    })),
+                };
+            }
+
+            throw new ApiError(404, 'Invalid pickup QR');
         },
         { maxWait: 10000, timeout: 30000 }
     );

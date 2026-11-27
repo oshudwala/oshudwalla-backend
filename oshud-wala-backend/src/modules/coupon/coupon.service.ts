@@ -34,28 +34,51 @@ export const listCoupons = async (role: RoleName) => repo.listCoupons(role !== '
 export const validateCoupon = async (codeRaw: string, subtotalPaise: number, userId: string) => {
     const code = String(codeRaw).trim().toUpperCase();
     const coupon = await repo.findCouponByCode(code);
-    if (!coupon || !coupon.isActive) throw new ApiError(404, 'Invalid or inactive coupon');
+    if (!coupon || !coupon.isActive) {
+        throw new ApiError(404, `Coupon "${code}" is invalid or inactive`);
+    }
 
     const now = new Date();
-    if (now < coupon.validFrom || now > coupon.validTo) {
-        throw new ApiError(400, 'Coupon is expired or not yet active');
+    if (now < coupon.validFrom) {
+        const fromStr = coupon.validFrom.toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+        });
+        throw new ApiError(400, `Coupon "${coupon.code}" is not active yet. Valid starting ${fromStr}`);
+    }
+    if (now > coupon.validTo) {
+        const toStr = coupon.validTo.toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+        });
+        throw new ApiError(400, `Coupon "${coupon.code}" has expired on ${toStr}`);
     }
     if (subtotalPaise < coupon.minOrderPaise) {
-        throw new ApiError(400, `Minimum order amount is ${coupon.minOrderPaise} paise`);
+        const minRs = Math.round(coupon.minOrderPaise / 100);
+        const currRs = Math.round(subtotalPaise / 100);
+        throw new ApiError(
+            400,
+            `Minimum order amount of ₹${minRs} required for coupon "${coupon.code}" (Your order: ₹${currRs})`
+        );
     }
     if (coupon.usageLimitTotal !== null && coupon.usedCount >= coupon.usageLimitTotal) {
-        throw new ApiError(400, 'Coupon usage limit reached');
+        throw new ApiError(400, `Coupon "${coupon.code}" has reached its maximum total usage limit`);
     }
-    if (coupon.usageLimitPerUser !== null) {
+    if (coupon.usageLimitPerUser !== null && userId) {
         const userCount = await repo.countUserRedemptions(coupon.id, userId);
         if (userCount >= coupon.usageLimitPerUser) {
-            throw new ApiError(400, 'You have already used this coupon the maximum number of times');
+            throw new ApiError(
+                400,
+                `You have already used coupon "${coupon.code}" the maximum allowed ${coupon.usageLimitPerUser} time(s)`
+            );
         }
     }
 
     let discountPaise =
         coupon.discountType === 'PERCENT'
-            ? Math.floor((subtotalPaise * coupon.discountValue) / 100)
+            ? Math.round((subtotalPaise * coupon.discountValue) / 100)
             : coupon.discountValue;
 
     if (coupon.maxDiscountPaise !== null && discountPaise > coupon.maxDiscountPaise) {
@@ -68,8 +91,17 @@ export const validateCoupon = async (codeRaw: string, subtotalPaise: number, use
     return {
         couponId: coupon.id,
         code: coupon.code,
+        description: coupon.description,
+        discountType: coupon.discountType,
+        discountValue: coupon.discountValue,
+        maxDiscountPaise: coupon.maxDiscountPaise,
+        minOrderPaise: coupon.minOrderPaise,
         discountPaise,
+        discountRupees: discountPaise / 100,
         finalPaise: subtotalPaise - discountPaise,
+        finalRupees: (subtotalPaise - discountPaise) / 100,
+        validTo: coupon.validTo,
+        usageLimitPerUser: coupon.usageLimitPerUser,
     };
 };
 

@@ -2,16 +2,16 @@ import { z } from 'zod';
 
 const fileItem = z.object({
     storageKey: z.string().trim().min(2, 'Cloudinary public_id / storageKey is required').max(300),
-    mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']),
+    mimeType: z.string().trim().transform(m => m === 'image/jpg' ? 'image/jpeg' : m),
     sizeBytes: z.number().int().min(1).max(10 * 1024 * 1024),
     checksumSha256: z.string().trim().min(8).max(128),
 });
 
 export const createPrescriptionSchema = z.object({
     body: z.object({
-        pharmacyId: z.string().uuid().optional().nullable(),
-        doctorName: z.string().trim().max(120).optional().nullable(),
-        patientNote: z.string().trim().max(500).optional().nullable(),
+        pharmacyId: z.string().uuid().optional().nullable().or(z.literal('')).transform(val => val || undefined),
+        doctorName: z.string().trim().max(120).optional().nullable().or(z.literal('')).transform(val => val || undefined),
+        patientNote: z.string().trim().max(500).optional().nullable().or(z.literal('')).transform(val => val || undefined),
         files: z.array(fileItem).min(1, 'At least one prescription file is required').max(5),
     }),
 });

@@ -98,6 +98,18 @@ export const autoUploadPrescriptionFiles = () => {
                     ...(filesObj?.photo || []),
                 ];
 
+                if (req.body && typeof req.body === 'object') {
+                    if (req.body.pharmacyId === '' || req.body.pharmacyId === 'null' || req.body.pharmacyId === 'undefined') {
+                        delete req.body.pharmacyId;
+                    }
+                    if (req.body.doctorName === '' || req.body.doctorName === 'null') {
+                        req.body.doctorName = null;
+                    }
+                    if (req.body.patientNote === '' || req.body.patientNote === 'null') {
+                        req.body.patientNote = null;
+                    }
+                }
+
                 if (incomingFiles.length > 0) {
                     const uploadedFiles = await Promise.all(
                         incomingFiles.map((f) =>

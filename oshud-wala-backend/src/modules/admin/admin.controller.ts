@@ -18,6 +18,12 @@ export const updateUserAccess = asyncHandler(async (req: AuthRequest, res: Respo
     res.status(200).json(new ApiResponse(200, result, "User access updated successfully"));
 });
 
+export const updateUserProfile = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { id } = req.params;
+    const result = await adminService.updateUserProfile(id, req.body);
+    res.status(200).json(new ApiResponse(200, result, "User profile updated successfully"));
+});
+
 export const getSettings = asyncHandler(async (req: AuthRequest, res: Response) => {
     const settings = await adminService.fetchAllSettings();
     res.status(200).json(new ApiResponse(200, settings, "Platform settings retrieved"));
@@ -28,4 +34,10 @@ export const setSetting = asyncHandler(async (req: AuthRequest, res: Response) =
     const { key, value } = req.body;
     const setting = await adminService.updateSetting(key, value, adminId);
     res.status(200).json(new ApiResponse(200, setting, "Platform setting updated"));
+});
+
+export const removeUser = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { id } = req.params;
+    const result = await adminService.deleteUser(id);
+    res.status(200).json(new ApiResponse(200, result, "User deleted successfully"));
 });

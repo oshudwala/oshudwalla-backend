@@ -40,6 +40,9 @@ export const updateGlobalDoctorSchema = z.object({
     params: z.object({ id: z.string().uuid("Invalid doctor id") }),
     body: z.object({
         fullName: z.string().trim().min(2).max(120).optional(),
+        phone: z.string().trim().regex(/^[0-9]{10,15}$/, "Valid phone number is required").optional().nullable(),
+        email: z.string().trim().email("Invalid email").optional().nullable(),
+        registrationNumber: z.string().trim().min(2).max(80).optional().nullable(),
         qualifications: z.string().trim().max(200).optional().nullable(),
         experienceYears: z.number().int().min(0).max(80).optional().nullable(),
         bio: z.string().trim().max(1000).optional().nullable(),

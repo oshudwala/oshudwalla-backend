@@ -49,3 +49,60 @@ export const sendTestPush = asyncHandler(async (req: AuthRequest, res: Response)
 
     res.status(200).json(new ApiResponse(200, null, "Push notification job enqueued successfully"));
 });
+
+// ---------------------------------------------------------------------------
+// IN-APP NOTIFICATIONS HANDLERS (Strictly scoped to req.user.userId)
+// ---------------------------------------------------------------------------
+
+export const getMyNotifications = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const userRole = req.user?.role;
+    const { page, limit, unreadOnly, category } = req.query;
+
+    const data = await notificationService.fetchUserNotifications(userId, userRole, {
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+        unreadOnly: unreadOnly === 'true' || unreadOnly === '1',
+        category: category as string,
+    });
+
+    res.status(200).json(new ApiResponse(200, data, "User notifications retrieved successfully"));
+});
+
+export const getUnreadCount = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const data = await notificationService.countUnread(userId);
+    res.status(200).json(new ApiResponse(200, data, "Unread notification count retrieved"));
+});
+
+export const markNotificationAsRead = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const notificationId = req.params.id;
+    const data = await notificationService.markRead(notificationId, userId);
+    res.status(200).json(new ApiResponse(200, data, "Notification marked as read"));
+});
+
+export const markAllNotificationsAsRead = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const data = await notificationService.markAllRead(userId);
+    res.status(200).json(new ApiResponse(200, data, "All notifications marked as read"));
+});
+
+export const deleteNotification = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const notificationId = req.params.id;
+    const data = await notificationService.removeNotification(notificationId, userId);
+    res.status(200).json(new ApiResponse(200, data, "Notification deleted successfully"));
+});
+
+export const clearReadNotifications = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const data = await notificationService.clearRead(userId);
+    res.status(200).json(new ApiResponse(200, data, "Read notifications cleared successfully"));
+});
+
+export const createNotification = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const data = await notificationService.createNotification(userId, req.body);
+    res.status(201).json(new ApiResponse(201, data, "Notification created successfully"));
+});

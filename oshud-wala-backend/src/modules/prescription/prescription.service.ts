@@ -6,18 +6,15 @@ import { PRESCRIPTION_CLEANUP_DELAY_MS, schedulePrescriptionImageCleanup } from 
 type Actor = { id: string; role: RoleName };
 
 export const submitPrescription = async (body: any, actor: Actor) => {
-    let targetPharmacyId: string;
-
-    if (body.pharmacyId) {
-        const ph = await repo.findPharmacyById(body.pharmacyId);
-        if (!ph || ph.status !== 'ACTIVE') throw new ApiError(404, 'Active pharmacy not found');
-        if (!ph.hasMedicineService) {
-            throw new ApiError(400, 'This clinic does not have online pharmacy/prescription service enabled');
-        }
-        targetPharmacyId = ph.id;
-    } else {
+    // If pharmacyId is explicitly passed and active, use it; otherwise route automatically to Primary Pharmacy
+    let targetPharmacyId = body.pharmacyId || null;
+    if (targetPharmacyId) {
+        const ph = await repo.findPharmacyById(targetPharmacyId);
+        if (!ph || ph.status !== 'ACTIVE') targetPharmacyId = null;
+    }
+    if (!targetPharmacyId) {
         const primary = await repo.findPrimaryMedicinePharmacy();
-        if (!primary) throw new ApiError(400, 'No active Primary Pharmacy with medicine service configured');
+        if (!primary) throw new ApiError(400, 'No active Primary Pharmacy configured');
         targetPharmacyId = primary.id;
     }
 
@@ -26,7 +23,7 @@ export const submitPrescription = async (body: any, actor: Actor) => {
         actor.id,
         targetPharmacyId,
         body.doctorName ? String(body.doctorName).trim() : null,
-        body.patientNote ? String(body.patientNote).trim() : null,
+        body.patientNote ? String(body.patientNote).trim() : (body.notes ? String(body.notes).trim() : null),
         body.files,
         expiresAt,
         actor
@@ -46,11 +43,39 @@ export const getMyPrescriptions = async (patientId: string) => {
 };
 
 export const getPharmacyPrescriptions = async (pharmacyId: string, actor: Actor) => {
+    const primary = await repo.findPrimaryMedicinePharmacy();
+    if (primary && primary.id !== pharmacyId && actor.role !== 'SUPER_ADMIN') {
+        // Prescriptions route exclusively to the primary pharmacy
+        return [];
+    }
     if (actor.role !== 'SUPER_ADMIN') {
         const link = await repo.findActiveOwnerLink(actor.id, pharmacyId);
         if (!link) throw new ApiError(403, 'You can only view prescriptions for your own pharmacy');
     }
     return await repo.listPharmacyPrescriptions(pharmacyId);
+};
+
+export const getPharmacyPrescriptionsForCurrentUser = async (actor: Actor) => {
+    const primary = await repo.findPrimaryMedicinePharmacy();
+
+    if (actor.role === 'SUPER_ADMIN') {
+        return await repo.listAllPrescriptions();
+    }
+
+    // Role is PHARMACY: Check which pharmacy this user is linked to
+    const staff = await repo.findStaffPharmacyByUserId(actor.id);
+    const pharmacyId = staff?.pharmacyId;
+
+    if (pharmacyId) {
+        return await repo.listPharmacyPrescriptions(pharmacyId);
+    }
+
+    // Fallback: if staff link wasn't explicit, but primary pharmacy exists, return primary
+    if (primary) {
+        return await repo.listPharmacyPrescriptions(primary.id);
+    }
+
+    return [];
 };
 
 export const reviewPrescription = async (

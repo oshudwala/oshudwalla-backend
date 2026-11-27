@@ -22,6 +22,11 @@ export const getPharmacyPrescriptions = asyncHandler(async (req: AuthRequest, re
     res.status(200).json(new ApiResponse(200, data, 'Pharmacy prescriptions retrieved'));
 });
 
+export const getPharmacyPrescriptionsForCurrentUser = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const data = await service.getPharmacyPrescriptionsForCurrentUser(actorOf(req));
+    res.status(200).json(new ApiResponse(200, data, 'Primary pharmacy prescriptions retrieved'));
+});
+
 export const reviewPrescription = asyncHandler(async (req: AuthRequest, res: Response) => {
     const data = await service.reviewPrescription(req.params.id, req.body.status, req.body.rejectionReason, actorOf(req));
     res.status(200).json(new ApiResponse(200, data, 'Prescription reviewed'));
