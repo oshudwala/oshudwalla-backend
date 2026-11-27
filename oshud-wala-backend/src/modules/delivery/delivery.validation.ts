@@ -25,6 +25,7 @@ export const completeDeliverySchema = z.object({
     params: z.object({ deliveryId: z.string().min(1, 'Invalid deliveryId') }),
     body: z.object({
         otp: z.string().trim().regex(/^[0-9]{4,6}$/, 'Valid delivery OTP is required'),
+        paymentMethod: z.enum(['COD', 'UPI', 'cod', 'upi']).optional(),
     }),
 });
 

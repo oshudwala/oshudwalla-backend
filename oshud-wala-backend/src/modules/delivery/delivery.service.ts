@@ -37,6 +37,6 @@ export const getCustomerDeliveryOtp = async (orderId: string, customerId: string
     };
 };
 
-export const completeDelivery = async (deliveryId: string, otp: string, actor: Actor) => {
-    return await repo.completeDeliveryWithOtpTx(deliveryId, actor.id, otp, actor);
+export const completeDelivery = async (deliveryId: string, otp: string, actor: Actor, paymentMethod?: string) => {
+    return await repo.completeDeliveryWithOtpTx(deliveryId, actor.id, otp, actor, paymentMethod);
 };

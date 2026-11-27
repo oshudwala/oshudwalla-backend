@@ -367,7 +367,7 @@ export const listPatientOrders = async (patientId: string) => {
             deliveryFee,
             totalPaise: o.totalPaise,
             subtotalPaise: o.subtotalPaise,
-            paymentMethod: o.paymentMethod,
+            paymentMethod: (addr as any)?.paymentMethod || o.paymentMethod || 'COD',
             paymentStatus: o.paymentStatus,
             deliveryOtp: otp,
             customerName: addr.fullName || o.patient?.fullName || 'Customer',

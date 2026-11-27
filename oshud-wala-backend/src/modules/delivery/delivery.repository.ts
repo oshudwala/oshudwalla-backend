@@ -494,7 +494,7 @@ const mapOrderPickupDetails = (order: any) => ({
     status: 'OUT_FOR_DELIVERY',
     totalAmount: Number(order.totalPaise || 0) / 100,
     total: Number(order.totalPaise || 0) / 100,
-    paymentMethod: order.paymentMethod,
+    paymentMethod: (order.deliveryAddress as any)?.paymentMethod || order.paymentMethod || 'COD',
     paymentStatus: order.paymentStatus,
     customerName: (order.deliveryAddress as any)?.fullName || order.patient?.fullName || 'Customer',
     customerPhone: (order.deliveryAddress as any)?.phone || order.patient?.phone || '',
@@ -833,9 +833,16 @@ export const findActiveCustomerDeliveryOtp = (orderId: string, customerId: strin
         orderBy: { createdAt: 'desc' },
     });
 
-export const completeDeliveryWithOtpTx = (deliveryId: string, riderId: string, otp: string, actor: Actor) =>
+export const completeDeliveryWithOtpTx = (
+    deliveryId: string,
+    riderId: string,
+    otp: string,
+    actor: Actor,
+    paymentMethod?: string
+) =>
     prisma.$transaction(
         async (tx) => {
+            const cleanPaymentMethod = (paymentMethod || '').trim().toUpperCase() === 'UPI' ? 'UPI' : 'COD';
             let delivery = isUuid(deliveryId)
                 ? await tx.delivery.findUnique({
                       where: { id: deliveryId },
@@ -895,6 +902,7 @@ export const completeDeliveryWithOtpTx = (deliveryId: string, riderId: string, o
                         deliveryAddress: {
                             ...(order.deliveryAddress as any),
                             deliveryOtp: cleanOtp,
+                            paymentMethod: cleanPaymentMethod,
                         },
                     },
                 });
@@ -907,7 +915,7 @@ export const completeDeliveryWithOtpTx = (deliveryId: string, riderId: string, o
                         actorRole: actor.role,
                     },
                 });
-                return { success: true, orderId: order.id, status: 'DELIVERED' };
+                return { success: true, orderId: order.id, status: 'DELIVERED', paymentMethod: cleanPaymentMethod };
             }
 
             let riderProfile: any = null;
@@ -995,6 +1003,7 @@ export const completeDeliveryWithOtpTx = (deliveryId: string, riderId: string, o
                     deliveryAddress: {
                         ...(delivery.order.deliveryAddress as any),
                         deliveryOtp: cleanOtp,
+                        paymentMethod: cleanPaymentMethod,
                     },
                 },
             });
@@ -1003,8 +1012,8 @@ export const completeDeliveryWithOtpTx = (deliveryId: string, riderId: string, o
                 data: { orderId: delivery.orderId, fromStatus: delivery.order.status, toStatus: 'DELIVERED', actorId: actor.id, actorRole: actor.role },
             });
 
-            // 1. Track COD Cash Collection idempotently
-            if (actualUserId) {
+            // 1. Track COD Cash Collection idempotently (only if payment is COD)
+            if (actualUserId && cleanPaymentMethod === 'COD') {
                 await tx.cashCollection.upsert({
                     where: { orderId: delivery.orderId },
                     create: {
@@ -1073,8 +1082,9 @@ export const completeDeliveryWithOtpTx = (deliveryId: string, riderId: string, o
                 deliveryId: completedDelivery.id,
                 orderId: delivery.orderId,
                 status: 'DELIVERED',
+                paymentMethod: cleanPaymentMethod,
                 riderEarningPaise: RIDER_EARNING_PAISE,
-                codCollectedPaise: delivery.order.totalPaise,
+                codCollectedPaise: cleanPaymentMethod === 'COD' ? delivery.order.totalPaise : 0,
                 walletBalancePaise: currentBalance.toString(),
             };
         },
