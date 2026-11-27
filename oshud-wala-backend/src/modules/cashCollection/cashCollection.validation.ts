@@ -2,8 +2,10 @@ import { z } from 'zod';
 
 export const submitDepositSchema = z.object({
     body: z.object({
-        collectionIds: z.array(z.string().uuid('Invalid collectionId')).min(1, 'At least one collectionId is required'),
-        method: z.enum(['CASH_HANDOVER', 'UPI', 'BANK_DEPOSIT']),
+        amount: z.number().min(1).optional(),
+        amountPaise: z.number().int().min(100).optional(),
+        collectionIds: z.array(z.string()).optional(),
+        method: z.string().optional(),
         referenceNo: z.string().trim().max(120).optional().nullable(),
     }),
 });

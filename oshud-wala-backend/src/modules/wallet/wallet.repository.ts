@@ -66,8 +66,12 @@ export const requestWithdrawalTx = (
                 throw new ApiError(400, 'Insufficient wallet balance for withdrawal');
             }
 
+            const isRiderInstant = role === 'RIDER';
+            const reqStatus = isRiderInstant ? 'PAID' : 'REQUESTED';
+            const now = new Date();
+
             const newBalance = w.balancePaise - amt;
-            const newHeld = w.heldPaise + amt;
+            const newHeld = isRiderInstant ? w.heldPaise : w.heldPaise + amt;
 
             await tx.wallet.update({
                 where: { id: w.id },
@@ -79,19 +83,20 @@ export const requestWithdrawalTx = (
                     walletId: w.id,
                     requestedById: userId,
                     amountPaise: amt,
-                    status: 'REQUESTED',
+                    status: reqStatus,
                     payoutDetails,
                     idempotencyKey,
+                    ...(isRiderInstant ? { reviewedById: userId, reviewedAt: now } : {}),
                 },
             });
 
             const ledgerTx = await tx.ledgerTransaction.create({
                 data: {
-                    txType: 'WITHDRAWAL_HOLD',
+                    txType: isRiderInstant ? 'WITHDRAWAL_PAYOUT' : 'WITHDRAWAL_HOLD',
                     referenceType: 'WITHDRAWAL',
                     referenceId: reqRow.id,
-                    idempotencyKey: `WITHDRAWAL_HOLD:${reqRow.id}`,
-                    description: 'Hold funds for withdrawal request',
+                    idempotencyKey: `WITHDRAWAL:${reqRow.id}`,
+                    description: `Withdrawal payout (${payoutDetails?.method || 'CASH'})`,
                     createdBy: userId,
                 },
             });
@@ -100,21 +105,50 @@ export const requestWithdrawalTx = (
                 data: {
                     transactionId: ledgerTx.id,
                     walletId: w.id,
-                    entryType: 'HOLD',
+                    entryType: isRiderInstant ? 'DEBIT' : 'HOLD',
                     amountPaise: amt,
                     balanceAfterPaise: newBalance,
                     heldAfterPaise: newHeld,
                 },
             });
 
+            if (isRiderInstant) {
+                await tx.settlement.create({
+                    data: {
+                        type: 'WITHDRAWAL_PAYOUT',
+                        amountPaise: amt,
+                        method: payoutDetails?.method || 'OFFLINE_CASH',
+                        referenceNo: `WTH-${reqRow.id.slice(0, 8).toUpperCase()}`,
+                        withdrawalRequestId: reqRow.id,
+                        settledById: userId,
+                    },
+                });
+            }
+
             return serializeBigInts(reqRow);
         },
         { maxWait: 10000, timeout: 30000 }
     );
 
+const isUuid = (val: any): boolean =>
+    typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
+
 export const listWithdrawals = async (actor: Actor) => {
+    let targetUserId = actor.id;
+    if (isUuid(actor.id)) {
+        const profile = await prisma.riderProfile.findFirst({
+            where: { OR: [{ userId: actor.id }, { id: actor.id }] },
+        });
+        if (profile) targetUserId = profile.userId;
+    }
+
     const rows = await prisma.withdrawalRequest.findMany({
-        where: actor.role === 'SUPER_ADMIN' ? {} : { requestedById: actor.id },
+        where: actor.role === 'SUPER_ADMIN' ? {} : {
+            OR: [
+                { requestedById: targetUserId },
+                ...(targetUserId !== actor.id ? [{ requestedById: actor.id }] : []),
+            ],
+        },
         orderBy: { requestedAt: 'desc' },
         include: { settlement: true },
     });

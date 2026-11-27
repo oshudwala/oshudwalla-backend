@@ -6,7 +6,7 @@ import { sha256Hex, encryptOtp } from './delivery.crypto';
 
 type Actor = { id: string; role: RoleName };
 
-const RIDER_EARNING_PAISE = Number(process.env.RIDER_EARNING_PAISE || 4000); // ₹40
+const RIDER_EARNING_PAISE = Number(process.env.RIDER_EARNING_PAISE || 3000); // ₹30
 
 interface ActivePickupQrInfo {
     qrToken: string;

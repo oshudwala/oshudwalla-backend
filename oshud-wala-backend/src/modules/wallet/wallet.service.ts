@@ -5,14 +5,16 @@ type Actor = { id: string; role: RoleName };
 
 export const getMyWallet = async (actor: Actor) => repo.getOrCreateUserWallet(actor.id, actor.role);
 
-export const requestWithdrawal = async (body: any, actor: Actor) =>
-    repo.requestWithdrawalTx(
+export const requestWithdrawal = async (body: any, actor: Actor) => {
+    const amountPaise = body.amountPaise || (body.amount ? Math.round(Number(body.amount) * 100) : 0);
+    return repo.requestWithdrawalTx(
         actor.id,
         actor.role,
-        body.amountPaise,
+        amountPaise,
         body.payoutDetails,
         body.idempotencyKey ? String(body.idempotencyKey).trim() : null
     );
+};
 
 export const listWithdrawals = async (actor: Actor) => repo.listWithdrawals(actor);
 

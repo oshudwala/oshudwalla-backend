@@ -5,50 +5,175 @@ import { serializeBigInts } from '../wallet/wallet.repository';
 
 type Actor = { id: string; role: RoleName };
 
+const isUuid = (val: any): boolean =>
+    typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
+
 export const getRiderCashSummary = async (riderId: string) => {
+    let targetUserId = riderId;
+    if (isUuid(riderId)) {
+        const profile = await prisma.riderProfile.findFirst({
+            where: { OR: [{ userId: riderId }, { id: riderId }] },
+        });
+        if (profile) targetUserId = profile.userId;
+    }
+
     const collections = await prisma.cashCollection.findMany({
-        where: { riderId },
+        where: {
+            OR: [
+                { riderId: targetUserId },
+                ...(riderId !== targetUserId ? [{ riderId }] : []),
+            ],
+        },
         orderBy: { collectedAt: 'desc' },
-        include: { order: { select: { id: true, orderNumber: true, totalPaise: true } } },
+        include: {
+            order: {
+                select: {
+                    id: true,
+                    orderNumber: true,
+                    totalPaise: true,
+                    deliveryAddress: true,
+                    patient: { select: { fullName: true } },
+                },
+            },
+        },
     });
-    const pendingCashPaise = collections
-        .filter((c) => c.status === 'COLLECTED' || c.status === 'DEPOSIT_PENDING')
-        .reduce((sum, c) => sum + c.amountPaise, 0);
-    return { pendingCashPaise, collections };
+
+    const deposits = await prisma.cashDeposit.findMany({
+        where: {
+            OR: [
+                { riderId: targetUserId },
+                ...(riderId !== targetUserId ? [{ riderId }] : []),
+            ],
+        },
+        orderBy: { submittedAt: 'desc' },
+    });
+
+    const totalCollectedPaise = collections.reduce((sum, c) => sum + c.amountPaise, 0);
+    const totalDepositedPaise = deposits
+        .filter((d) => d.status !== 'REJECTED')
+        .reduce((sum, d) => sum + d.amountPaise, 0);
+
+    const cashInHandPaise = Math.max(0, totalCollectedPaise - totalDepositedPaise);
+    const cashInHand = cashInHandPaise / 100;
+
+    return {
+        cashInHandPaise,
+        cashInHand,
+        totalCollectedPaise,
+        totalDepositedPaise,
+        collections: collections.map((c) => ({
+            id: c.id,
+            orderId: c.order?.orderNumber || c.order?.id || c.orderId,
+            customerName: (c.order?.deliveryAddress as any)?.fullName || c.order?.patient?.fullName || 'Customer',
+            amount: c.amountPaise / 100,
+            amountPaise: c.amountPaise,
+            collectedAt: c.collectedAt,
+            status: c.status,
+            depositId: c.depositId,
+        })),
+        deposits: deposits.map((d) => ({
+            id: d.id,
+            depositId: d.referenceNo || `DEP-${d.id.slice(0, 8).toUpperCase()}`,
+            amount: d.amountPaise / 100,
+            amountPaise: d.amountPaise,
+            status: d.status,
+            method: d.method,
+            submittedAt: d.submittedAt,
+        })),
+    };
 };
 
-export const submitDepositTx = (riderId: string, collectionIds: string[], method: string, referenceNo: string | null) =>
+export const submitDepositTx = (
+    riderId: string,
+    amountPaise?: number,
+    method?: string,
+    referenceNo?: string | null,
+    collectionIds?: string[]
+) =>
     prisma.$transaction(
         async (tx) => {
-            const rows = await tx.cashCollection.findMany({
-                where: { id: { in: collectionIds }, riderId },
-            });
-            if (rows.length !== collectionIds.length) {
-                throw new ApiError(404, 'One or more cash collections not found for this rider');
-            }
-            for (const r of rows) {
-                if (r.status !== 'COLLECTED') {
-                    throw new ApiError(400, `Cash collection ${r.id} is already ${r.status}`);
-                }
+            let targetUserId = riderId;
+            if (isUuid(riderId)) {
+                const profile = await tx.riderProfile.findFirst({
+                    where: { OR: [{ userId: riderId }, { id: riderId }] },
+                });
+                if (profile) targetUserId = profile.userId;
             }
 
-            const totalPaise = rows.reduce((sum, r) => sum + r.amountPaise, 0);
+            const collections = await tx.cashCollection.findMany({
+                where: {
+                    OR: [
+                        { riderId: targetUserId },
+                        ...(riderId !== targetUserId ? [{ riderId }] : []),
+                    ],
+                },
+            });
+            const deposits = await tx.cashDeposit.findMany({
+                where: {
+                    OR: [
+                        { riderId: targetUserId },
+                        ...(riderId !== targetUserId ? [{ riderId }] : []),
+                    ],
+                    status: { not: 'REJECTED' },
+                },
+            });
+
+            const totalCollected = collections.reduce((s, c) => s + c.amountPaise, 0);
+            const totalDeposited = deposits.reduce((s, d) => s + d.amountPaise, 0);
+            const currentCashInHandPaise = Math.max(0, totalCollected - totalDeposited);
+
+            let depositPaise = amountPaise || 0;
+            if (!depositPaise && collectionIds && collectionIds.length > 0) {
+                depositPaise = collections
+                    .filter((c) => collectionIds.includes(c.id))
+                    .reduce((s, c) => s + c.amountPaise, 0);
+            }
+
+            if (depositPaise <= 0) {
+                throw new ApiError(400, 'Deposit amount must be greater than ₹0');
+            }
+
+            if (depositPaise > currentCashInHandPaise) {
+                throw new ApiError(
+                    400,
+                    `Deposit amount (₹${(depositPaise / 100).toFixed(2)}) exceeds physical cash in hand (₹${(currentCashInHandPaise / 100).toFixed(2)})`
+                );
+            }
+
+            const refId = referenceNo || `DEP-${Date.now().toString().slice(-6)}`;
             const deposit = await tx.cashDeposit.create({
                 data: {
-                    riderId,
-                    amountPaise: totalPaise,
-                    method,
-                    referenceNo,
+                    riderId: targetUserId,
+                    amountPaise: depositPaise,
+                    method: method || 'CASH_HANDOVER',
+                    referenceNo: refId,
                     status: 'SUBMITTED',
                 },
             });
 
-            await tx.cashCollection.updateMany({
-                where: { id: { in: collectionIds } },
-                data: { status: 'DEPOSITED', depositId: deposit.id },
-            });
+            if (collectionIds && collectionIds.length > 0) {
+                await tx.cashCollection.updateMany({
+                    where: { id: { in: collectionIds } },
+                    data: { status: 'DEPOSITED', depositId: deposit.id },
+                });
+            } else {
+                const pendingCollections = collections.filter((c) => c.status === 'COLLECTED');
+                let remaining = depositPaise;
+                const toMarkIds: string[] = [];
+                for (const col of pendingCollections) {
+                    if (remaining <= 0) break;
+                    toMarkIds.push(col.id);
+                    remaining -= col.amountPaise;
+                }
+                if (toMarkIds.length > 0) {
+                    await tx.cashCollection.updateMany({
+                        where: { id: { in: toMarkIds } },
+                        data: { status: 'DEPOSITED', depositId: deposit.id },
+                    });
+                }
+            }
 
-            return deposit;
+            return serializeBigInts(deposit);
         },
         { maxWait: 10000, timeout: 30000 }
     );

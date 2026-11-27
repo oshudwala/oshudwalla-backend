@@ -39,5 +39,5 @@ export const getCustomerDeliveryOtp = asyncHandler(async (req: AuthRequest, res:
 
 export const completeDelivery = asyncHandler(async (req: AuthRequest, res: Response) => {
     const data = await service.completeDelivery(req.params.deliveryId, req.body.otp, actorOf(req), req.body.paymentMethod);
-    res.status(200).json(new ApiResponse(200, data, 'Delivery completed and ₹40 credited to rider wallet'));
+    res.status(200).json(new ApiResponse(200, data, 'Delivery completed and ₹30 credited to rider wallet'));
 });
