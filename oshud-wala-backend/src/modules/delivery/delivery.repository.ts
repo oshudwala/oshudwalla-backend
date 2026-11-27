@@ -353,10 +353,10 @@ export const listRiderDeliveries = async (riderId: string, actor?: Actor) => {
           })
         : [];
 
-    if (deliveries.length === 0 && actor?.role === 'SUPER_ADMIN') {
+    if (deliveries.length === 0) {
         deliveries = await prisma.delivery.findMany({
-            where: { status: { in: ['ASSIGNED', 'ACCEPTED', 'PICKED_UP', 'ARRIVED'] as any } },
             orderBy: { assignedAt: 'desc' },
+            take: 20,
             include: {
                 batch: { include: { pickupQrs: true } },
                 order: {
@@ -906,6 +906,9 @@ export const completeDeliveryWithOtpTx = (
                         },
                     },
                 });
+                if (cleanPaymentMethod === 'UPI') {
+                    await tx.cashCollection.deleteMany({ where: { orderId: order.id } });
+                }
                 await tx.orderStatusHistory.create({
                     data: {
                         orderId: order.id,
@@ -1012,7 +1015,7 @@ export const completeDeliveryWithOtpTx = (
                 data: { orderId: delivery.orderId, fromStatus: delivery.order.status, toStatus: 'DELIVERED', actorId: actor.id, actorRole: actor.role },
             });
 
-            // 1. Track COD Cash Collection idempotently (only if payment is COD)
+            // 1. Track COD Cash Collection idempotently (ONLY if payment is COD)
             if (actualUserId && cleanPaymentMethod === 'COD') {
                 await tx.cashCollection.upsert({
                     where: { orderId: delivery.orderId },
@@ -1027,6 +1030,11 @@ export const completeDeliveryWithOtpTx = (
                         status: 'COLLECTED',
                         collectedAt: now,
                     },
+                });
+            } else {
+                // If paymentMethod is UPI, strictly delete any cash collection for this order so it NEVER adds to physical cash in hand
+                await tx.cashCollection.deleteMany({
+                    where: { orderId: delivery.orderId },
                 });
             }
 

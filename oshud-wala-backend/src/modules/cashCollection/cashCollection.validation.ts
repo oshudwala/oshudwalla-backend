@@ -14,6 +14,7 @@ export const verifyDepositSchema = z.object({
     params: z.object({ id: z.string().uuid('Invalid deposit id') }),
     body: z.object({
         decision: z.enum(['VERIFIED', 'REJECTED']),
+        password: z.string().optional(),
         rejectionReason: z.string().trim().max(300).optional().nullable(),
     }).refine((d) => d.decision !== 'REJECTED' || Boolean(d.rejectionReason && d.rejectionReason.length >= 3), {
         message: 'rejectionReason is required when rejecting a deposit',

@@ -26,3 +26,13 @@ export const reviewWithdrawal = asyncHandler(async (req: AuthRequest, res: Respo
     const data = await service.reviewWithdrawal(req.params.id, req.body, actorOf(req));
     res.status(200).json(new ApiResponse(200, data, 'Withdrawal reviewed'));
 });
+
+export const getAdminFinanceOverview = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const data = await service.getAdminFinanceOverview(req.query.month as string);
+    res.status(200).json(new ApiResponse(200, data, 'Admin finance overview retrieved'));
+});
+
+export const adminDisburseToRider = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const data = await service.adminDisburseToRider(req.body, actorOf(req));
+    res.status(200).json(new ApiResponse(200, data, 'Payment disbursed to rider successfully'));
+});

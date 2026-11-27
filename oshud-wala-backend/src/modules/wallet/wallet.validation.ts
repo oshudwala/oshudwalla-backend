@@ -23,6 +23,7 @@ export const reviewWithdrawalSchema = z.object({
         method: z.string().trim().min(2).max(50).optional(),
         referenceNo: z.string().trim().max(120).optional().nullable(),
         rejectionReason: z.string().trim().max(300).optional().nullable(),
+        password: z.string().optional(),
     }).refine((d) => d.decision !== 'REJECTED' || Boolean(d.rejectionReason && d.rejectionReason.length >= 3), {
         message: 'rejectionReason is required when rejecting a withdrawal',
         path: ['rejectionReason'],

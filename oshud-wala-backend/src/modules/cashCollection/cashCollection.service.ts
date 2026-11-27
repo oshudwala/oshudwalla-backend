@@ -22,5 +22,10 @@ export const verifyDeposit = async (depositId: string, body: any, actor: Actor) 
         depositId,
         body.decision,
         body.rejectionReason ? String(body.rejectionReason).trim() : null,
-        actor
+        actor,
+        body.password
     );
+
+export const listDeposits = async (riderId?: string) => repo.listAllDeposits(riderId);
+
+export const listRiderCashSummaries = async () => repo.listAllRidersCashOverview();

@@ -21,3 +21,13 @@ export const verifyDeposit = asyncHandler(async (req: AuthRequest, res: Response
     const data = await service.verifyDeposit(req.params.id, req.body, actorOf(req));
     res.status(200).json(new ApiResponse(200, data, 'COD cash deposit reviewed'));
 });
+
+export const listDeposits = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const data = await service.listDeposits(req.query.riderId as string);
+    res.status(200).json(new ApiResponse(200, data, 'Cash deposits retrieved'));
+});
+
+export const listRiderCashSummaries = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const data = await service.listRiderCashSummaries();
+    res.status(200).json(new ApiResponse(200, data, 'Rider cash summaries retrieved'));
+});

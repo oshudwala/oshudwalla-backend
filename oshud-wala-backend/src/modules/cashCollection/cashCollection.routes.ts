@@ -9,6 +9,8 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/my', authorizeRoles('RIDER'), c.getMyCash);
+router.get('/deposits', authorizeRoles('SUPER_ADMIN'), c.listDeposits);
+router.get('/admin/riders', authorizeRoles('SUPER_ADMIN'), c.listRiderCashSummaries);
 router.post('/deposits', authorizeRoles('RIDER'), validate(submitDepositSchema), c.submitDeposit);
 router.patch('/deposits/:id/verify', authorizeRoles('SUPER_ADMIN'), validate(verifyDepositSchema), c.verifyDeposit);
 

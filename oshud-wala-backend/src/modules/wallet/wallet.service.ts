@@ -25,5 +25,11 @@ export const reviewWithdrawal = async (id: string, body: any, actor: Actor) =>
         body.method ? String(body.method).trim() : 'BANK_TRANSFER',
         body.referenceNo ? String(body.referenceNo).trim() : null,
         body.rejectionReason ? String(body.rejectionReason).trim() : null,
-        actor
+        actor,
+        body.password
     );
+
+export const getAdminFinanceOverview = async (month?: string) => repo.getAdminFinanceOverview(month);
+
+export const adminDisburseToRider = async (body: any, actor: Actor) =>
+    repo.adminDisburseToRiderTx(body.riderId, Number(body.amount), actor, body.note);
