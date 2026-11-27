@@ -14,8 +14,8 @@ export const getOrderPickupQr = async (orderId: string, actor: Actor) => {
     return await repo.getOrderPickupQr(orderId, actor);
 };
 
-export const getMyDeliveries = async (riderId: string) => {
-    return await repo.listRiderDeliveries(riderId);
+export const getMyDeliveries = async (riderId: string, actor: Actor) => {
+    return await repo.listRiderDeliveries(riderId, actor);
 };
 
 export const scanPickupQr = async (qrToken: string, actor: Actor) => {
