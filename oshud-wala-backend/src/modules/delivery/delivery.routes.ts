@@ -22,7 +22,7 @@ router.get('/order/:orderId/pickup-qr', authorizeRoles('SUPER_ADMIN', 'PHARMACY'
 
 // Rider endpoints (also authorized for SUPER_ADMIN for testing and verification)
 router.get('/my', authorizeRoles('RIDER', 'SUPER_ADMIN'), c.getMyDeliveries);
-router.post('/pickup-qr/scan', authorizeRoles('RIDER', 'SUPER_ADMIN'), validate(scanPickupQrSchema), c.scanPickupQr);
+router.post('/pickup-qr/scan', authorizeRoles('RIDER', 'SUPER_ADMIN', 'PHARMACY'), validate(scanPickupQrSchema), c.scanPickupQr);
 router.post('/:deliveryId/arrived', authorizeRoles('RIDER', 'SUPER_ADMIN'), validate(deliveryIdParamSchema), c.markArrived);
 router.post('/:deliveryId/complete', authorizeRoles('RIDER', 'SUPER_ADMIN'), validate(completeDeliverySchema), c.completeDelivery);
 
