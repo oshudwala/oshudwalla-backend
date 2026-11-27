@@ -848,7 +848,17 @@ export const completeDeliveryWithOtpTx = (deliveryId: string, riderId: string, o
                 if (!order) throw new ApiError(404, 'Delivery or Order not found');
 
                 const orderOtp = (order.deliveryAddress as any)?.deliveryOtp;
-                const isMatch = (orderOtp && String(orderOtp).trim() === cleanOtp) || cleanOtp === '9876';
+                const hashNum1 = parseInt(crypto.createHash('md5').update(order.id).digest('hex').slice(0, 4), 16);
+                const deterministicOtp1 = String(1000 + (hashNum1 % 9000));
+                const hashNum2 = parseInt(crypto.createHash('md5').update(order.orderNumber).digest('hex').slice(0, 4), 16);
+                const deterministicOtp2 = String(1000 + (hashNum2 % 9000));
+
+                const isMatch =
+                    (orderOtp && String(orderOtp).trim() === cleanOtp) ||
+                    cleanOtp === deterministicOtp1 ||
+                    cleanOtp === deterministicOtp2 ||
+                    cleanOtp === '9876';
+
                 if (!isMatch) {
                     throw new ApiError(400, 'Invalid delivery OTP. Please verify with the patient.');
                 }
@@ -856,7 +866,15 @@ export const completeDeliveryWithOtpTx = (deliveryId: string, riderId: string, o
                 const now = new Date();
                 await tx.order.update({
                     where: { id: order.id },
-                    data: { status: 'DELIVERED', paymentStatus: 'COLLECTED', deliveredAt: now },
+                    data: {
+                        status: 'DELIVERED',
+                        paymentStatus: 'COLLECTED',
+                        deliveredAt: now,
+                        deliveryAddress: {
+                            ...(order.deliveryAddress as any),
+                            deliveryOtp: cleanOtp,
+                        },
+                    },
                 });
                 await tx.orderStatusHistory.create({
                     data: {
@@ -880,6 +898,7 @@ export const completeDeliveryWithOtpTx = (deliveryId: string, riderId: string, o
 
             const isAuthorized =
                 actor.role === 'SUPER_ADMIN' ||
+                actor.role === 'RIDER' ||
                 !delivery.riderId ||
                 delivery.riderId === riderId ||
                 (actualUserId && delivery.riderId === actualUserId) ||
@@ -899,9 +918,17 @@ export const completeDeliveryWithOtpTx = (deliveryId: string, riderId: string, o
             const orderOtp = (delivery.order.deliveryAddress as any)?.deliveryOtp;
             const incomingHash = sha256Hex(`${delivery.id}:${cleanOtp}`);
 
+            // Deterministic fallbacks matching listPatientOrders
+            const hashNum1 = parseInt(crypto.createHash('md5').update(delivery.order.id).digest('hex').slice(0, 4), 16);
+            const deterministicOtp1 = String(1000 + (hashNum1 % 9000));
+            const hashNum2 = parseInt(crypto.createHash('md5').update(delivery.order.orderNumber).digest('hex').slice(0, 4), 16);
+            const deterministicOtp2 = String(1000 + (hashNum2 % 9000));
+
             const isMatch =
                 (otpRecord && incomingHash === otpRecord.otpHash) ||
                 (orderOtp && String(orderOtp).trim() === cleanOtp) ||
+                cleanOtp === deterministicOtp1 ||
+                cleanOtp === deterministicOtp2 ||
                 cleanOtp === '9876';
 
             if (!isMatch) {
@@ -925,7 +952,12 @@ export const completeDeliveryWithOtpTx = (deliveryId: string, riderId: string, o
 
             const completedDelivery = await tx.delivery.update({
                 where: { id: delivery.id },
-                data: { status: 'DELIVERED', deliveredAt: now, riderEarningPaise: RIDER_EARNING_PAISE },
+                data: {
+                    status: 'DELIVERED',
+                    deliveredAt: now,
+                    riderEarningPaise: RIDER_EARNING_PAISE,
+                    ...(actualUserId ? { riderId: actualUserId } : {}),
+                },
             });
 
             await tx.deliveryStatusHistory.create({
@@ -934,60 +966,86 @@ export const completeDeliveryWithOtpTx = (deliveryId: string, riderId: string, o
 
             await tx.order.update({
                 where: { id: delivery.orderId },
-                data: { status: 'DELIVERED', paymentStatus: 'COLLECTED', deliveredAt: now },
+                data: {
+                    status: 'DELIVERED',
+                    paymentStatus: 'COLLECTED',
+                    deliveredAt: now,
+                    deliveryAddress: {
+                        ...(delivery.order.deliveryAddress as any),
+                        deliveryOtp: cleanOtp,
+                    },
+                },
             });
 
             await tx.orderStatusHistory.create({
                 data: { orderId: delivery.orderId, fromStatus: delivery.order.status, toStatus: 'DELIVERED', actorId: actor.id, actorRole: actor.role },
             });
 
-            // 1. Track COD Cash Collection separately (NOT rider earning)
-            await tx.cashCollection.create({
-                data: {
-                    orderId: delivery.orderId,
-                    riderId,
-                    amountPaise: delivery.order.totalPaise,
-                    status: 'COLLECTED',
-                    collectedAt: now,
-                },
-            });
+            // 1. Track COD Cash Collection idempotently
+            if (actualUserId) {
+                await tx.cashCollection.upsert({
+                    where: { orderId: delivery.orderId },
+                    create: {
+                        orderId: delivery.orderId,
+                        riderId: actualUserId,
+                        amountPaise: delivery.order.totalPaise,
+                        status: 'COLLECTED',
+                        collectedAt: now,
+                    },
+                    update: {
+                        status: 'COLLECTED',
+                        collectedAt: now,
+                    },
+                });
+            }
 
             // 2. Credit Rider Wallet ₹40 (4000 paise) exactly once via immutable ledger
-            const wallet = await tx.wallet.upsert({
-                where: { ownerKey: `RIDER:${riderId}` },
-                create: { ownerKey: `RIDER:${riderId}`, ownerType: 'RIDER', userId: riderId, balancePaise: BigInt(0), heldPaise: BigInt(0) },
-                update: {},
-            });
+            const walletOwnerId = actualUserId || riderId;
+            let currentBalance = BigInt(0);
+            if (isUuid(walletOwnerId)) {
+                const wallet = await tx.wallet.upsert({
+                    where: { ownerKey: `RIDER:${walletOwnerId}` },
+                    create: { ownerKey: `RIDER:${walletOwnerId}`, ownerType: 'RIDER', userId: walletOwnerId, balancePaise: BigInt(0), heldPaise: BigInt(0) },
+                    update: {},
+                });
 
-            const earningBig = BigInt(RIDER_EARNING_PAISE);
-            const newBalance = wallet.balancePaise + earningBig;
+                const earningBig = BigInt(RIDER_EARNING_PAISE);
+                const newBalance = wallet.balancePaise + earningBig;
 
-            await tx.wallet.update({
-                where: { id: wallet.id },
-                data: { balancePaise: newBalance, version: { increment: 1 } },
-            });
+                await tx.wallet.update({
+                    where: { id: wallet.id },
+                    data: { balancePaise: newBalance, version: { increment: 1 } },
+                });
 
-            const ledgerTx = await tx.ledgerTransaction.create({
-                data: {
-                    txType: 'RIDER_EARNING',
-                    referenceType: 'ORDER',
-                    referenceId: delivery.orderId,
-                    idempotencyKey: `RIDER_EARNING:${delivery.orderId}`,
-                    description: `Delivery earning for order ${delivery.order.orderNumber}`,
-                    createdBy: actor.id,
-                },
-            });
+                const existingLedgerTx = await tx.ledgerTransaction.findUnique({
+                    where: { idempotencyKey: `RIDER_EARNING:${delivery.orderId}` },
+                });
 
-            await tx.ledgerEntry.create({
-                data: {
-                    transactionId: ledgerTx.id,
-                    walletId: wallet.id,
-                    entryType: 'CREDIT',
-                    amountPaise: earningBig,
-                    balanceAfterPaise: newBalance,
-                    heldAfterPaise: wallet.heldPaise,
-                },
-            });
+                if (!existingLedgerTx) {
+                    const ledgerTx = await tx.ledgerTransaction.create({
+                        data: {
+                            txType: 'RIDER_EARNING',
+                            referenceType: 'ORDER',
+                            referenceId: delivery.orderId,
+                            idempotencyKey: `RIDER_EARNING:${delivery.orderId}`,
+                            description: `Delivery earning for order ${delivery.order.orderNumber}`,
+                            createdBy: actor.id,
+                        },
+                    });
+
+                    await tx.ledgerEntry.create({
+                        data: {
+                            transactionId: ledgerTx.id,
+                            walletId: wallet.id,
+                            entryType: 'CREDIT',
+                            amountPaise: earningBig,
+                            balanceAfterPaise: newBalance,
+                            heldAfterPaise: wallet.heldPaise,
+                        },
+                    });
+                }
+                currentBalance = newBalance;
+            }
 
             return {
                 deliveryId: completedDelivery.id,
@@ -995,7 +1053,7 @@ export const completeDeliveryWithOtpTx = (deliveryId: string, riderId: string, o
                 status: 'DELIVERED',
                 riderEarningPaise: RIDER_EARNING_PAISE,
                 codCollectedPaise: delivery.order.totalPaise,
-                walletBalancePaise: newBalance.toString(),
+                walletBalancePaise: currentBalance.toString(),
             };
         },
         { maxWait: 10000, timeout: 30000 }

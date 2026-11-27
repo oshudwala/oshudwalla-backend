@@ -337,6 +337,19 @@ export const listPatientOrders = async (patientId: string) => {
             otp = String(1000 + (hashNum % 9000));
         }
 
+        // Persist the computed OTP to deliveryAddress if not yet saved
+        if (!(o.deliveryAddress as any)?.deliveryOtp) {
+            prisma.order.update({
+                where: { id: o.id },
+                data: {
+                    deliveryAddress: {
+                        ...((o.deliveryAddress as any) || {}),
+                        deliveryOtp: otp,
+                    },
+                },
+            }).catch(() => {});
+        }
+
         const subtotal = Number(o.subtotalPaise || 0) / 100;
         const total = Number(o.totalPaise || 0) / 100;
         const deliveryFee = Number(o.deliveryFeePaise || 0) / 100;
