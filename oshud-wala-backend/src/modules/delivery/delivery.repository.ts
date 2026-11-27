@@ -195,6 +195,28 @@ export const assignOrdersToRiderTx = (riderId: string, orderIds: string[], actor
                         },
                     }).catch(() => {});
                 }
+
+                // In-app notification for fulfillment Pharmacy
+                if (o.pharmacyId) {
+                    const pharmacyStaff = await tx.pharmacyStaff.findMany({
+                        where: { pharmacyId: o.pharmacyId, isActive: true },
+                        select: { userId: true },
+                    });
+                    for (const ps of pharmacyStaff) {
+                        await tx.notification.create({
+                            data: {
+                                userId: ps.userId,
+                                category: 'DELIVERY',
+                                eventType: 'RIDER_ASSIGNED',
+                                title: `Rider Assigned for Order #${o.orderNumber || o.id}`,
+                                body: `Rider ${riderProfile.user?.fullName || 'Courier'} assigned to pick up Order #${o.orderNumber || o.id}.`,
+                                data: { orderId: o.id, orderNumber: o.orderNumber, link: '/pharmacy/pickup' },
+                                priority: 'NORMAL',
+                                dedupeKey: `notif_pharm_assign_${o.id}_${ps.userId}`,
+                            },
+                        }).catch(() => {});
+                    }
+                }
             }
 
             // Generate one single-use Pickup QR per unique pharmacy in this batch

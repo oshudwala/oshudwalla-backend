@@ -51,12 +51,14 @@ export const modifyPreferences = async (userId: string, globalSettings?: any, ca
 
 export const fetchUserNotifications = async (userId: string, role?: string, options: any = {}) => {
     if (!userId) throw new ApiError(401, 'Unauthorized access');
-    // Only return real/original notifications from the database for this specific user
+    // Ensure pharmacy in-app notifications are synced with active db state
+    await notificationRepo.syncPharmacyNotifications(userId, role);
     return await notificationRepo.getNotificationsByUser(userId, options);
 };
 
-export const countUnread = async (userId: string) => {
+export const countUnread = async (userId: string, role?: string) => {
     if (!userId) throw new ApiError(401, 'Unauthorized access');
+    await notificationRepo.syncPharmacyNotifications(userId, role);
     const unreadCount = await notificationRepo.getUnreadCountByUser(userId);
     return { unreadCount };
 };

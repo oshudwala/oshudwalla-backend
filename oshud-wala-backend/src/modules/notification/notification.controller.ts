@@ -71,7 +71,8 @@ export const getMyNotifications = asyncHandler(async (req: AuthRequest, res: Res
 
 export const getUnreadCount = asyncHandler(async (req: AuthRequest, res: Response) => {
     const userId = req.user!.userId;
-    const data = await notificationService.countUnread(userId);
+    const userRole = req.user?.role;
+    const data = await notificationService.countUnread(userId, userRole);
     res.status(200).json(new ApiResponse(200, data, "Unread notification count retrieved"));
 });
 

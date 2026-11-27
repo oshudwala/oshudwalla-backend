@@ -5,9 +5,10 @@ import * as repo from './order.repository';
 type Actor = { id: string; role: RoleName };
 
 const ALLOWED_PHARMACY_TRANSITIONS: Record<string, OrderStatus[]> = {
-    PENDING_PHARMACY_REVIEW: ['ACCEPTED', 'REJECTED'],
-    ACCEPTED: ['PREPARING'],
+    PENDING_PHARMACY_REVIEW: ['ACCEPTED', 'REJECTED', 'PREPARING'],
+    ACCEPTED: ['PREPARING', 'READY_FOR_PICKUP'],
     PREPARING: ['READY_FOR_PICKUP'],
+    READY_FOR_PICKUP: ['PREPARING', 'RIDER_ASSIGNED'],
 };
 
 export const placeOrder = async (body: any, actor: Actor) => {

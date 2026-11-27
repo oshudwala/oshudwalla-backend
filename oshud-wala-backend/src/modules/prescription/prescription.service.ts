@@ -1,4 +1,5 @@
 import { PrescriptionStatus, RoleName } from '@prisma/client';
+import { prisma } from '../../config/prisma';
 import { ApiError } from '../../utils/apiError';
 import * as repo from './prescription.repository';
 import { PRESCRIPTION_CLEANUP_DELAY_MS, schedulePrescriptionImageCleanup } from './prescription.cleanup';
@@ -34,6 +35,28 @@ export const submitPrescription = async (body: any, actor: Actor) => {
         created.id,
         body.files.map((f: any) => f.storageKey)
     );
+
+    // Create in-app notification for pharmacy staff
+    try {
+        const staff = await prisma.pharmacyStaff.findMany({
+            where: { pharmacyId: targetPharmacyId, isActive: true },
+            select: { userId: true },
+        });
+        for (const s of staff) {
+            await prisma.notification.create({
+                data: {
+                    userId: s.userId,
+                    category: 'PRESCRIPTION',
+                    eventType: 'PRESCRIPTION_SUBMITTED',
+                    title: `New Prescription Awaiting Audit (#${created.prescriptionNumber})`,
+                    body: `Patient submitted prescription #${created.prescriptionNumber} for pharmacist audit & verification.`,
+                    data: { prescriptionId: created.id, prescriptionNumber: created.prescriptionNumber, link: '/pharmacy/prescriptions' },
+                    priority: 'HIGH',
+                    dedupeKey: `rx_sub_${created.id}_${s.userId}`,
+                },
+            }).catch(() => {});
+        }
+    } catch (e) {}
 
     return created;
 };

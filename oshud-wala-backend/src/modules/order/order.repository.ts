@@ -560,6 +560,8 @@ export const createWalkInOrderTx = (body: any, actor: Actor) =>
                 })
             );
 
+            const initialStatus = body.status === 'READY_FOR_PICKUP' ? 'READY_FOR_PICKUP' : 'PREPARING';
+
             const order = await tx.order.create({
                 data: {
                     orderNumber,
@@ -579,9 +581,9 @@ export const createWalkInOrderTx = (body: any, actor: Actor) =>
                         notes: body.notes || '',
                         deliveryOtp,
                     },
-                    status: 'READY_FOR_PICKUP',
+                    status: initialStatus,
                     paymentMethod: 'COD',
-                    paymentStatus: 'COLLECTED',
+                    paymentStatus: 'PENDING',
                     subtotalPaise,
                     couponDiscountPaise: discountPaise,
                     deliveryFeePaise,
@@ -590,7 +592,7 @@ export const createWalkInOrderTx = (body: any, actor: Actor) =>
                     history: {
                         create: {
                             fromStatus: null,
-                            toStatus: 'READY_FOR_PICKUP',
+                            toStatus: initialStatus,
                             actorId: actor.id,
                             actorRole: actor.role,
                         },
@@ -606,6 +608,28 @@ export const createWalkInOrderTx = (body: any, actor: Actor) =>
                     },
                 },
             });
+
+            // In-app notification for pharmacy staff for preparation
+            if (targetPharmacyId) {
+                const pharmacyStaff = await tx.pharmacyStaff.findMany({
+                    where: { pharmacyId: targetPharmacyId, isActive: true },
+                    select: { userId: true },
+                });
+                for (const ps of pharmacyStaff) {
+                    await tx.notification.create({
+                        data: {
+                            userId: ps.userId,
+                            category: 'ORDER',
+                            eventType: 'ORDER_PREPARING',
+                            title: `Order #${order.orderNumber} - Approved & Preparing`,
+                            body: `Prescription approved. Please assemble package and mark "Prepared" when ready for dispatch.`,
+                            data: { orderId: order.id, orderNumber: order.orderNumber, link: '/pharmacy/orders' },
+                            priority: 'HIGH',
+                            dedupeKey: `notif_order_prep_${order.id}_${ps.userId}`,
+                        },
+                    }).catch(() => {});
+                }
+            }
 
             if (linkedPrescriptionId) {
                 try {

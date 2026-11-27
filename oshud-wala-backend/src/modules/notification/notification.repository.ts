@@ -176,3 +176,114 @@ export const createInAppNotification = async (data: {
         }
     });
 };
+
+export const syncPharmacyNotifications = async (userId: string, role?: string) => {
+    try {
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            include: { role: true, pharmacyStaff: true },
+        });
+
+        const isPharmacy =
+            role === 'PHARMACY' ||
+            user?.role?.name === 'PHARMACY' ||
+            (user?.pharmacyStaff && user.pharmacyStaff.some((s: any) => s.isActive));
+
+        if (!isPharmacy) return;
+
+        // Find primary or associated pharmacy
+        let targetPharmacyId = user?.pharmacyStaff?.find((s: any) => s.isActive)?.pharmacyId;
+        if (!targetPharmacyId) {
+            const primary = await prisma.pharmacy.findFirst({
+                where: { isPrimary: true, status: 'ACTIVE' },
+            });
+            targetPharmacyId = primary?.id;
+        }
+        if (!targetPharmacyId) {
+            const anyActive = await prisma.pharmacy.findFirst({
+                where: { status: 'ACTIVE' },
+            });
+            targetPharmacyId = anyActive?.id;
+        }
+
+        if (!targetPharmacyId) return;
+
+        // 1. Sync pending prescriptions for this pharmacy
+        const pendingRx = await prisma.prescription.findMany({
+            where: {
+                status: { in: ['SUBMITTED', 'FORWARDED_TO_PHARMACY', 'PHARMACY_VERIFYING'] },
+                OR: [{ pharmacyId: targetPharmacyId }, { pharmacyId: null }],
+            },
+            take: 20,
+            orderBy: { createdAt: 'desc' },
+            include: { items: true },
+        });
+
+        for (const rx of pendingRx) {
+            const dedupeKey = `rx_audit_${rx.id}`;
+            await prisma.notification.upsert({
+                where: { userId_dedupeKey: { userId, dedupeKey } },
+                create: {
+                    userId,
+                    category: 'PRESCRIPTION',
+                    eventType: 'PRESCRIPTION_SUBMITTED',
+                    title: `Prescription Awaiting Audit #${rx.prescriptionNumber}`,
+                    body: `Prescription #${rx.prescriptionNumber} submitted for pharmacist verification & dispensing.`,
+                    data: {
+                        prescriptionId: rx.id,
+                        prescriptionNumber: rx.prescriptionNumber,
+                        link: '/pharmacy/prescriptions',
+                    },
+                    priority: 'HIGH',
+                    dedupeKey,
+                },
+                update: {},
+            }).catch(() => {});
+        }
+
+        // 2. Sync orders requiring pharmacy fulfillment
+        const activeOrders = await prisma.order.findMany({
+            where: {
+                pharmacyId: targetPharmacyId,
+                status: { in: ['ACCEPTED', 'PREPARING', 'READY_FOR_PICKUP'] },
+            },
+            take: 20,
+            orderBy: { placedAt: 'desc' },
+            include: { items: true },
+        });
+
+        for (const o of activeOrders) {
+            const dedupeKey = `ord_action_${o.status.toLowerCase()}_${o.id}`;
+            let title = `Order #${o.orderNumber}`;
+            let body = `Order #${o.orderNumber} for ₹${(o.totalPaise / 100).toFixed(2)}`;
+            let link = '/pharmacy/orders';
+
+            if (o.status === 'PREPARING') {
+                title = `Order #${o.orderNumber} - Approved & Preparing`;
+                body = `Prescription approved. Pack medicines and click "Prepared" when ready for pickup.`;
+                link = '/pharmacy/orders';
+            } else if (o.status === 'READY_FOR_PICKUP') {
+                title = `Order #${o.orderNumber} - Approved & Prepared`;
+                body = `Medicines packed and ready for rider pickup and handover.`;
+                link = '/pharmacy/pickup';
+            }
+
+            await prisma.notification.upsert({
+                where: { userId_dedupeKey: { userId, dedupeKey } },
+                create: {
+                    userId,
+                    category: o.status === 'READY_FOR_PICKUP' ? 'DELIVERY' : 'ORDER',
+                    eventType: `ORDER_${o.status}`,
+                    title,
+                    body,
+                    data: { orderId: o.id, orderNumber: o.orderNumber, link },
+                    priority: 'NORMAL',
+                    dedupeKey,
+                },
+                update: {},
+            }).catch(() => {});
+        }
+    } catch (err) {
+        console.warn('syncPharmacyNotifications warning:', err);
+    }
+};
