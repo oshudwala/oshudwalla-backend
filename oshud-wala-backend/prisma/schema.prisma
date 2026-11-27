@@ -1633,3 +1633,20 @@ model ReceptionistDoctor {
   @@index([pharmacyDoctorId, isActive])
   @@map("receptionist_doctors")
 }
+
+
+model Announcement {
+  id          String    @id @default(uuid()) @db.Uuid
+  title       String
+  message     String
+  priority    String    @default("INFO") // "INFO" | "WARNING" | "URGENT"
+  targetRoles String[]  @default(["ALL"])
+  isActive    Boolean   @default(true)
+  expiresAt   DateTime?
+  createdById String    @db.Uuid
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([isActive, createdAt])
+  @@map("announcements")
+}

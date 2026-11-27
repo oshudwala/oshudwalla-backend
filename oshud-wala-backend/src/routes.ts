@@ -27,6 +27,7 @@ import reviewRoutes from './modules/review/review.routes';
 import patientSearchRoutes from './modules/patient-search/patient-search.routes';
 import receptionistDoctorRoutes from './modules/receptionist-doctor/receptionist-doctor.routes';
 import featuredRoutes from './modules/featured/featured.routes';
+import announcementRoutes from './modules/announcement/announcement.routes';
 
 const router = Router();
 
@@ -58,5 +59,7 @@ router.use('/reviews', reviewRoutes);
 router.use('/patients', patientSearchRoutes);
 router.use('/receptionist-doctors', receptionistDoctorRoutes);
 router.use('/featured', featuredRoutes);
+
+router.use('/announcements', announcementRoutes);
 
 export default router;
