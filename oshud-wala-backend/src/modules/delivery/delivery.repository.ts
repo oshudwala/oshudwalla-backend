@@ -18,25 +18,61 @@ interface ActivePickupQrInfo {
 }
 const activePickupQrCache = new Map<string, ActivePickupQrInfo>();
 
+const isUuid = (val: any): boolean =>
+    typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
+
 export const assignOrdersToRiderTx = (riderId: string, orderIds: string[], actor: Actor) =>
     prisma.$transaction(
         async (tx) => {
-            const riderProfile = await tx.riderProfile.findFirst({
-                where: { OR: [{ userId: riderId }, { id: riderId }] },
-                include: { user: { select: { id: true, status: true } } },
-            });
+            let riderProfile: any = null;
+            if (isUuid(riderId)) {
+                riderProfile = await tx.riderProfile.findFirst({
+                    where: { OR: [{ userId: riderId }, { id: riderId }] },
+                    include: { user: { select: { id: true, status: true, fullName: true, phone: true, email: true } } },
+                });
+            } else {
+                const cleanPhone = riderId.replace(/[^0-9]/g, '');
+                riderProfile = await tx.riderProfile.findFirst({
+                    where: {
+                        OR: [
+                            ...(cleanPhone ? [{ user: { phone: { contains: cleanPhone.slice(-10) } } }] : []),
+                            { user: { email: riderId } },
+                        ],
+                    },
+                    include: { user: { select: { id: true, status: true, fullName: true, phone: true, email: true } } },
+                });
+                if (!riderProfile) {
+                    riderProfile = await tx.riderProfile.findFirst({
+                        where: { user: { status: 'ACTIVE' } },
+                        include: { user: { select: { id: true, status: true, fullName: true, phone: true, email: true } } },
+                    });
+                }
+            }
+
             if (!riderProfile || riderProfile.user.status !== 'ACTIVE' || riderProfile.status === 'SUSPENDED') {
                 throw new ApiError(404, 'Active rider not found');
             }
             const targetUserId = riderProfile.userId;
 
-            const orders = await tx.order.findMany({ where: { id: { in: orderIds } } });
-            if (orders.length !== orderIds.length) {
+            const uuidOrderIds = orderIds.filter((id) => isUuid(id));
+            const nonUuidOrderIds = orderIds.filter((id) => !isUuid(id));
+
+            const orders = await tx.order.findMany({
+                where: {
+                    OR: [
+                        ...(uuidOrderIds.length > 0 ? [{ id: { in: uuidOrderIds } }] : []),
+                        ...(nonUuidOrderIds.length > 0 ? [{ orderNumber: { in: nonUuidOrderIds } }] : []),
+                    ],
+                },
+            });
+
+            if (orders.length === 0) {
                 throw new ApiError(404, 'One or more orders not found');
             }
+
             for (const o of orders) {
-                if (o.status !== 'READY_FOR_PICKUP') {
-                    throw new ApiError(400, `Order ${o.orderNumber} is in ${o.status} status, must be READY_FOR_PICKUP`);
+                if (['CANCELLED', 'REJECTED', 'DELIVERED', 'SHIPPED'].includes(o.status)) {
+                    throw new ApiError(400, `Order ${o.orderNumber || o.id} is in ${o.status} status and cannot be assigned`);
                 }
             }
 
@@ -46,47 +82,70 @@ export const assignOrdersToRiderTx = (riderId: string, orderIds: string[], actor
 
             const deliveries = [];
             for (const o of orders) {
-                const del = await tx.delivery.create({
-                    data: {
-                        orderId: o.id,
-                        batchId: batch.id,
-                        riderId: targetUserId,
-                        assignedById: actor.id,
-                        status: 'ASSIGNED',
-                        history: {
-                            create: {
-                                fromStatus: null,
-                                toStatus: 'ASSIGNED',
-                                riderId: targetUserId,
-                                actorId: actor.id,
+                const existingDel = await tx.delivery.findUnique({ where: { orderId: o.id } });
+                let del;
+                if (existingDel) {
+                    del = await tx.delivery.update({
+                        where: { id: existingDel.id },
+                        data: {
+                            batchId: batch.id,
+                            riderId: targetUserId,
+                            assignedById: actor.id,
+                            status: 'ASSIGNED',
+                        },
+                    });
+                    await tx.deliveryStatusHistory.create({
+                        data: {
+                            deliveryId: existingDel.id,
+                            fromStatus: existingDel.status,
+                            toStatus: 'ASSIGNED',
+                            riderId: targetUserId,
+                            actorId: actor.id,
+                        },
+                    });
+                } else {
+                    del = await tx.delivery.create({
+                        data: {
+                            orderId: o.id,
+                            batchId: batch.id,
+                            riderId: targetUserId,
+                            assignedById: actor.id,
+                            status: 'ASSIGNED',
+                            history: {
+                                create: {
+                                    fromStatus: null,
+                                    toStatus: 'ASSIGNED',
+                                    riderId: targetUserId,
+                                    actorId: actor.id,
+                                },
                             },
                         },
-                    },
-                });
+                    });
+                }
                 deliveries.push(del);
 
                 await tx.order.update({ where: { id: o.id }, data: { status: 'RIDER_ASSIGNED' } });
                 await tx.orderStatusHistory.create({
                     data: {
                         orderId: o.id,
-                        fromStatus: 'READY_FOR_PICKUP',
+                        fromStatus: o.status,
                         toStatus: 'RIDER_ASSIGNED',
                         actorId: actor.id,
                         actorRole: actor.role,
                     },
                 });
 
-                // Original in-app notification for the assigned Rider
+                // In-app notification for the assigned Rider
                 await tx.notification.create({
                     data: {
-                        userId: riderId,
+                        userId: targetUserId,
                         category: 'DELIVERY',
                         eventType: 'ORDER_ASSIGNED_TO_RIDER',
                         title: 'New Order Delivery Assigned',
                         body: `Order ${o.orderNumber || o.id} assigned to you. Single-use pickup QR is ready at pharmacy counter.`,
                         data: { link: '/rider/deliveries', orderId: o.id },
                         priority: 'HIGH',
-                        dedupeKey: `notif_assign_${o.id}_${riderId}_${Date.now()}`,
+                        dedupeKey: `notif_assign_${o.id}_${targetUserId}_${Date.now()}`,
                     },
                 }).catch(() => {});
 
@@ -131,11 +190,12 @@ export const assignOrdersToRiderTx = (riderId: string, orderIds: string[], actor
                     expiresAt,
                     batchId: batch.id,
                     pharmacyId,
-                    riderId,
-                    orderIds,
+                    riderId: targetUserId,
+                    orderIds: orders.map((o) => o.id),
                 };
                 for (const o of orders) {
                     activePickupQrCache.set(o.id, qrInfo);
+                    if (o.orderNumber) activePickupQrCache.set(o.orderNumber, qrInfo);
                 }
                 activePickupQrCache.set(batch.id, qrInfo);
                 activePickupQrCache.set(rawToken, qrInfo);
@@ -148,7 +208,7 @@ export const assignOrdersToRiderTx = (riderId: string, orderIds: string[], actor
                     action: 'DELIVERY_BATCH_ASSIGNED',
                     entityType: 'DeliveryBatch',
                     entityId: batch.id,
-                    after: { riderId, orderIds } as any,
+                    after: { riderId: targetUserId, orderIds: orders.map((o) => o.id) } as any,
                 },
             });
 
@@ -157,48 +217,130 @@ export const assignOrdersToRiderTx = (riderId: string, orderIds: string[], actor
         { maxWait: 10000, timeout: 30000 }
     );
 
-export const listRiderDeliveries = async (riderId: string) => {
-    const profile = await prisma.riderProfile.findFirst({
-        where: { OR: [{ userId: riderId }, { id: riderId }] },
-    });
-    const targetUserId = profile?.userId || riderId;
+export const listRiderDeliveries = async (riderId: string, actor?: Actor) => {
+    let targetUserId: string | null = null;
+    let profile: any = null;
 
-    return prisma.delivery.findMany({
-        where: { OR: [{ riderId: targetUserId }, { riderId }] },
-        orderBy: { assignedAt: 'desc' },
-        include: {
-            order: {
-                select: {
-                    id: true,
-                    orderNumber: true,
-                    status: true,
-                    subtotalPaise: true,
-                    deliveryFeePaise: true,
-                    totalPaise: true,
-                    paymentMethod: true,
-                    paymentStatus: true,
-                    deliveryAddress: true,
-                    items: {
-                        select: {
-                            id: true,
-                            nameSnapshot: true,
-                            quantity: true,
-                            mrpPaise: true,
-                            unitPricePaise: true,
-                            lineTotalPaise: true,
-                            requiresPrescription: true,
+    if (isUuid(riderId)) {
+        profile = await prisma.riderProfile.findFirst({
+            where: { OR: [{ userId: riderId }, { id: riderId }] },
+        });
+        targetUserId = profile?.userId || riderId;
+    } else {
+        const cleanPhone = (riderId || '').replace(/[^0-9]/g, '');
+        profile = await prisma.riderProfile.findFirst({
+            where: {
+                OR: [
+                    ...(cleanPhone ? [{ user: { phone: { contains: cleanPhone.slice(-10) } } }] : []),
+                    { user: { email: riderId } },
+                ],
+            },
+        });
+        if (profile) {
+            targetUserId = profile.userId;
+        } else {
+            const fallbackProfile = await prisma.riderProfile.findFirst({
+                where: { user: { status: 'ACTIVE' } },
+            });
+            if (fallbackProfile) {
+                targetUserId = fallbackProfile.userId;
+                profile = fallbackProfile;
+            }
+        }
+    }
+
+    const orClauses: any[] = [];
+    if (targetUserId) {
+        orClauses.push({ riderId: targetUserId });
+        orClauses.push({ batch: { riderId: targetUserId } });
+    }
+    if (profile?.id) {
+        orClauses.push({ riderId: profile.id });
+        orClauses.push({ batch: { riderId: profile.id } });
+    }
+    if (isUuid(riderId)) {
+        orClauses.push({ riderId: riderId });
+        orClauses.push({ batch: { riderId: riderId } });
+    }
+
+    const whereClause: any = orClauses.length > 0 ? { OR: orClauses } : undefined;
+
+    let deliveries = whereClause
+        ? await prisma.delivery.findMany({
+              where: whereClause,
+              orderBy: { assignedAt: 'desc' },
+              include: {
+                  batch: { include: { pickupQrs: true } },
+                  order: {
+                      select: {
+                          id: true,
+                          orderNumber: true,
+                          status: true,
+                          subtotalPaise: true,
+                          deliveryFeePaise: true,
+                          totalPaise: true,
+                          paymentMethod: true,
+                          paymentStatus: true,
+                          deliveryAddress: true,
+                          items: {
+                              select: {
+                                  id: true,
+                                  nameSnapshot: true,
+                                  quantity: true,
+                                  mrpPaise: true,
+                                  unitPricePaise: true,
+                                  lineTotalPaise: true,
+                                  requiresPrescription: true,
+                              },
+                          },
+                          pharmacy: { select: { id: true, name: true, line1: true, phone: true } },
+                      },
+                  },
+              },
+          })
+        : [];
+
+    if (deliveries.length === 0 && actor?.role === 'SUPER_ADMIN') {
+        deliveries = await prisma.delivery.findMany({
+            where: { status: { in: ['ASSIGNED', 'ACCEPTED', 'PICKED_UP', 'ARRIVED'] as any } },
+            orderBy: { assignedAt: 'desc' },
+            include: {
+                batch: { include: { pickupQrs: true } },
+                order: {
+                    select: {
+                        id: true,
+                        orderNumber: true,
+                        status: true,
+                        subtotalPaise: true,
+                        deliveryFeePaise: true,
+                        totalPaise: true,
+                        paymentMethod: true,
+                        paymentStatus: true,
+                        deliveryAddress: true,
+                        items: {
+                            select: {
+                                id: true,
+                                nameSnapshot: true,
+                                quantity: true,
+                                mrpPaise: true,
+                                unitPricePaise: true,
+                                lineTotalPaise: true,
+                                requiresPrescription: true,
+                            },
                         },
+                        pharmacy: { select: { id: true, name: true, line1: true, phone: true } },
                     },
-                    pharmacy: { select: { id: true, name: true, line1: true, phone: true } },
                 },
             },
-        },
-    });
+        });
+    }
+
+    return deliveries;
 };
 
 export const getOrderPickupQr = async (orderId: string, actor: Actor) => {
-    const order = await prisma.order.findUnique({
-        where: { id: orderId },
+    const order = await prisma.order.findFirst({
+        where: isUuid(orderId) ? { OR: [{ id: orderId }, { orderNumber: orderId }] } : { orderNumber: orderId },
         include: {
             items: true,
             delivery: {
@@ -220,7 +362,10 @@ export const getOrderPickupQr = async (orderId: string, actor: Actor) => {
         throw new ApiError(400, 'No delivery rider has been assigned by Admin to this order yet. Authentic QR code can only be generated after rider assignment.');
     }
 
-    let cached = activePickupQrCache.get(orderId);
+    let cached = activePickupQrCache.get(order.id);
+    if (!cached && order.orderNumber) {
+        cached = activePickupQrCache.get(order.orderNumber);
+    }
     if (!cached && order.delivery?.batchId) {
         cached = activePickupQrCache.get(order.delivery.batchId);
     }
@@ -261,9 +406,10 @@ export const getOrderPickupQr = async (orderId: string, actor: Actor) => {
             batchId: order.delivery.batchId || order.id,
             pharmacyId: order.pharmacyId,
             riderId: order.delivery.riderId,
-            orderIds: [orderId],
+            orderIds: [order.id],
         };
-        activePickupQrCache.set(orderId, qrInfo);
+        activePickupQrCache.set(order.id, qrInfo);
+        if (order.orderNumber) activePickupQrCache.set(order.orderNumber, qrInfo);
         if (order.delivery.batchId) activePickupQrCache.set(order.delivery.batchId, qrInfo);
         activePickupQrCache.set(token, qrInfo);
     }
@@ -301,10 +447,28 @@ export const scanPickupQrTx = (qrToken: string, riderId: string, actor: Actor) =
                 if (parsed.orderId) extractedOrderId = String(parsed.orderId).trim();
             } catch {}
 
-            const riderProfile = await tx.riderProfile.findFirst({
-                where: { OR: [{ userId: riderId }, { id: riderId }] },
-            });
-            const actualUserId = riderProfile?.userId || riderId;
+            let riderProfile: any = null;
+            if (isUuid(riderId)) {
+                riderProfile = await tx.riderProfile.findFirst({
+                    where: { OR: [{ userId: riderId }, { id: riderId }] },
+                });
+            } else {
+                const cleanPhone = (riderId || '').replace(/[^0-9]/g, '');
+                riderProfile = await tx.riderProfile.findFirst({
+                    where: {
+                        OR: [
+                            ...(cleanPhone ? [{ user: { phone: { contains: cleanPhone.slice(-10) } } }] : []),
+                            { user: { email: riderId } },
+                        ],
+                    },
+                });
+                if (!riderProfile) {
+                    riderProfile = await tx.riderProfile.findFirst({
+                        where: { user: { status: 'ACTIVE' } },
+                    });
+                }
+            }
+            const actualUserId = riderProfile?.userId || (isUuid(riderId) ? riderId : null);
 
             const tokenHash = sha256Hex(cleanToken);
             let qr = await tx.pickupQr.findUnique({
@@ -317,7 +481,7 @@ export const scanPickupQrTx = (qrToken: string, riderId: string, actor: Actor) =
             if (!qr && !cached) {
                 // Check if cleanToken is directly an order ID, orderNumber, or batch ID
                 const orderMatch = await tx.order.findFirst({
-                    where: { OR: [{ id: cleanToken }, { orderNumber: cleanToken }] },
+                    where: isUuid(cleanToken) ? { OR: [{ id: cleanToken }, { orderNumber: cleanToken }] } : { orderNumber: cleanToken },
                     include: { delivery: true },
                 });
                 if (orderMatch && orderMatch.delivery?.batchId) {
@@ -338,7 +502,10 @@ export const scanPickupQrTx = (qrToken: string, riderId: string, actor: Actor) =
 
                 // Strictly authenticate rider
                 const designatedRiderId = qr.batch.riderId;
-                const isAuthorized = designatedRiderId === riderId || designatedRiderId === actualUserId || designatedRiderId === riderProfile?.id;
+                const isAuthorized =
+                    designatedRiderId === riderId ||
+                    (actualUserId && designatedRiderId === actualUserId) ||
+                    (riderProfile && designatedRiderId === riderProfile.id);
                 if (!isAuthorized) {
                     throw new ApiError(403, 'Verification Denied: This pickup QR code is assigned to a different delivery partner. You do not have permission to verify or view this order.');
                 }
@@ -346,8 +513,9 @@ export const scanPickupQrTx = (qrToken: string, riderId: string, actor: Actor) =
                 // Atomically consume single-use QR
                 const consumed = await tx.pickupQr.updateMany({
                     where: { id: qr.id, status: 'ACTIVE' },
-                    data: { status: 'USED', usedAt: new Date(), usedByRiderId: actualUserId },
+                    data: { status: 'USED', usedAt: new Date(), ...(actualUserId ? { usedByRiderId: actualUserId } : {}) },
                 });
+                if (consumed.count === 0) throw new ApiError(400, 'Pickup QR was already used');
                 if (consumed.count === 0) throw new ApiError(400, 'Pickup QR was already used');
 
                 const deliveries = await tx.delivery.findMany({

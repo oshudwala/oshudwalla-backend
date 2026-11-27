@@ -18,7 +18,7 @@ export const getOrderPickupQr = asyncHandler(async (req: AuthRequest, res: Respo
 });
 
 export const getMyDeliveries = asyncHandler(async (req: AuthRequest, res: Response) => {
-    const data = await service.getMyDeliveries(req.user!.userId);
+    const data = await service.getMyDeliveries(req.user!.userId, actorOf(req));
     res.status(200).json(new ApiResponse(200, data, 'Assigned deliveries retrieved'));
 });
 
