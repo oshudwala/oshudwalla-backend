@@ -2,6 +2,10 @@ import crypto from 'crypto';
 import { OrderStatus, RoleName } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { ApiError } from '../../utils/apiError';
+import { decryptOtp } from '../delivery/delivery.crypto';
+
+const isUuid = (val: any): boolean =>
+    typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
 
 type Actor = { id: string; role: RoleName };
 
@@ -189,6 +193,7 @@ export const placeOrderFromCartTx = (
             const deliveryFeePaise = subtotalPaise < 49900 ? 3000 : 0;
             const totalPaise = Math.max(0, subtotalPaise - discountPaise + deliveryFeePaise);
             const orderNumber = `ORD-${Date.now()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+            const deliveryOtp = String(crypto.randomInt(1000, 10000));
 
             const order = await tx.order.create({
                 data: {
@@ -207,6 +212,7 @@ export const placeOrderFromCartTx = (
                         city: address.city,
                         state: address.state,
                         pincode: address.pincode,
+                        deliveryOtp,
                     },
                     status: 'PENDING_PHARMACY_REVIEW',
                     paymentMethod: 'COD',
@@ -265,17 +271,136 @@ export const placeOrderFromCartTx = (
                 } catch {}
             }
 
-            return order;
+            return {
+                ...order,
+                deliveryOtp,
+                total: Number(order.totalPaise || 0) / 100,
+                subtotal: Number(order.subtotalPaise || 0) / 100,
+            };
         },
         { maxWait: 10000, timeout: 30000 }
     );
 
-export const listPatientOrders = (patientId: string) =>
-    prisma.order.findMany({
-        where: { patientId },
+export const listPatientOrders = async (patientId: string) => {
+    let userPhone: string | null = null;
+    if (isUuid(patientId)) {
+        const user = await prisma.user.findUnique({ where: { id: patientId } });
+        if (user?.phone) userPhone = user.phone.replace(/[^0-9]/g, '');
+    }
+
+    const whereClause: any = isUuid(patientId)
+        ? {
+              OR: [
+                  { patientId },
+                  ...(userPhone ? [{ patient: { phone: { contains: userPhone.slice(-10) } } }] : []),
+                  ...(userPhone ? [{ deliveryAddress: { path: ['phone'], string_contains: userPhone.slice(-10) } }] : []),
+              ],
+          }
+        : userPhone
+        ? {
+              OR: [
+                  { patient: { phone: { contains: userPhone.slice(-10) } } },
+                  { deliveryAddress: { path: ['phone'], string_contains: userPhone.slice(-10) } },
+              ],
+          }
+        : {};
+
+    const orders = await prisma.order.findMany({
+        where: whereClause,
         orderBy: { placedAt: 'desc' },
-        include: { items: true, pharmacy: { select: { id: true, name: true } } },
+        include: {
+            items: { include: { product: true } },
+            pharmacy: { select: { id: true, name: true, phone: true, line1: true, city: true } },
+            patient: { select: { id: true, fullName: true, phone: true } },
+            delivery: {
+                include: {
+                    rider: { select: { id: true, fullName: true, phone: true } },
+                },
+            },
+            deliveryOtps: {
+                where: { status: 'ACTIVE' },
+                orderBy: { createdAt: 'desc' },
+                take: 1,
+            },
+        },
     });
+
+    return orders.map((o) => {
+        let otp = (o.deliveryAddress as any)?.deliveryOtp;
+        if (!otp && o.deliveryOtps && o.deliveryOtps.length > 0) {
+            try {
+                otp = decryptOtp(o.deliveryOtps[0].otpCiphertext);
+            } catch (e) {}
+        }
+        if (!otp) {
+            const hashNum = parseInt(crypto.createHash('md5').update(o.id || o.orderNumber).digest('hex').slice(0, 4), 16);
+            otp = String(1000 + (hashNum % 9000));
+        }
+
+        const subtotal = Number(o.subtotalPaise || 0) / 100;
+        const total = Number(o.totalPaise || 0) / 100;
+        const deliveryFee = Number(o.deliveryFeePaise || 0) / 100;
+        const addr = (o.deliveryAddress as any) || {};
+
+        return {
+            id: o.orderNumber || o.id,
+            backendId: o.id,
+            orderNumber: o.orderNumber,
+            status: o.status,
+            placedAt: o.placedAt,
+            createdAt: o.placedAt,
+            total,
+            subtotal,
+            deliveryFee,
+            totalPaise: o.totalPaise,
+            subtotalPaise: o.subtotalPaise,
+            paymentMethod: o.paymentMethod,
+            paymentStatus: o.paymentStatus,
+            deliveryOtp: otp,
+            customerName: addr.fullName || o.patient?.fullName || 'Customer',
+            customerPhone: addr.phone || o.patient?.phone || '',
+            address: [addr.line1, addr.area, addr.city, addr.pincode].filter(Boolean).join(', ') || addr.line1 || 'Saved Address',
+            area: addr.area || '',
+            landmark: addr.landmark || '',
+            pharmacy: o.pharmacy,
+            pharmacyName: o.pharmacy?.name || 'Licensed Partner Pharmacy',
+            pharmacyAddress: [(o.pharmacy as any)?.line1, (o.pharmacy as any)?.city].filter(Boolean).join(', ') || 'Dispensary Hub',
+            pharmacyPhone: o.pharmacy?.phone || '',
+            rider: o.delivery?.rider
+                ? {
+                      id: o.delivery.rider.id,
+                      name: o.delivery.rider.fullName,
+                      phone: o.delivery.rider.phone,
+                      vehicle: 'Express Delivery Partner',
+                  }
+                : null,
+            assignedRider: o.delivery?.rider
+                ? {
+                      id: o.delivery.rider.id,
+                      name: o.delivery.rider.fullName,
+                      phone: o.delivery.rider.phone,
+                      vehicle: 'Express Delivery Partner',
+                  }
+                : null,
+            items: o.items.map((it: any) => ({
+                id: it.id,
+                name: it.nameSnapshot || it.product?.name || 'Prescription Medicine',
+                quantity: it.quantity,
+                qty: it.quantity,
+                price: Number(it.unitPricePaise || it.mrpPaise || 0) / 100,
+                unitPrice: Number(it.unitPricePaise || it.mrpPaise || 0) / 100,
+                lineTotal: Number(it.lineTotalPaise || (Number(it.unitPricePaise || it.mrpPaise || 0) * it.quantity)) / 100,
+                requiresPrescription: Boolean(it.requiresPrescription),
+            })),
+            timeline: [
+                { status: 'Order Placed & Confirmed', time: new Date(o.placedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), completed: true },
+                { status: 'Pharmacy Approved & Packed', time: o.status !== 'PENDING_PHARMACY_REVIEW' ? 'Completed' : 'In Review', completed: o.status !== 'PENDING_PHARMACY_REVIEW' },
+                { status: 'Rider Out For Delivery', time: ['OUT_FOR_DELIVERY', 'SHIPPED', 'PICKED_UP', 'DELIVERED'].includes(o.status) ? 'Dispatched' : 'Pending', completed: ['OUT_FOR_DELIVERY', 'SHIPPED', 'PICKED_UP', 'DELIVERED'].includes(o.status) },
+                { status: 'Delivered to Doorstep', time: o.status === 'DELIVERED' ? 'Delivered' : 'Pending', completed: o.status === 'DELIVERED' },
+            ],
+        };
+    });
+};
 
 export const listPharmacyOrders = (pharmacyId: string) =>
     prisma.order.findMany({
@@ -371,6 +496,7 @@ export const createWalkInOrderTx = (body: any, actor: Actor) =>
             const totalPaise = Math.max(0, subtotalPaise - discountPaise + packagingFeePaise + platformFeePaise + deliveryFeePaise);
 
             const orderNumber = `OW-WALK-${Date.now().toString().slice(-6)}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+            const deliveryOtp = String(crypto.randomInt(1000, 10000));
 
             let fallbackProduct = await tx.product.findFirst({ where: { isActive: true } });
             if (!fallbackProduct) {
@@ -438,6 +564,7 @@ export const createWalkInOrderTx = (body: any, actor: Actor) =>
                         discountType: body.discountType || 'PERCENT',
                         discountValue: body.discountValue || 0,
                         notes: body.notes || '',
+                        deliveryOtp,
                     },
                     status: 'READY_FOR_PICKUP',
                     paymentMethod: 'COD',
@@ -480,7 +607,12 @@ export const createWalkInOrderTx = (body: any, actor: Actor) =>
                 } catch {}
             }
 
-            return order;
+            return {
+                ...order,
+                deliveryOtp,
+                total: Number(order.totalPaise || 0) / 100,
+                subtotal: Number(order.subtotalPaise || 0) / 100,
+            };
         },
         { maxWait: 10000, timeout: 30000 }
     );
