@@ -15,7 +15,7 @@ export const saveOrUpdateDeviceToken = async (userId: string, fcmToken: string, 
         data: {
             userId,
             token: fcmToken,
-            platform: deviceType, // Ekhane deviceType er value ta platform e dhukiye dilam
+            platform: deviceType,
             deviceId: deviceId || ""
         }
     });
@@ -26,8 +26,6 @@ export const removeDeviceToken = async (userId: string, fcmToken: string) => {
         where: { userId, token: fcmToken }
     });
 };
-
-
 
 export const getNotificationSettings = async (userId: string) => {
     return await prisma.notificationSetting.findUnique({
@@ -50,9 +48,8 @@ export const upsertGlobalSettings = async (userId: string, data: any) => {
 };
 
 export const upsertCategoryPreferences = async (userId: string, categories: any[]) => {
-    // Execute multiple upserts in a transaction
     return await prisma.$transaction(
-        categories.map(cat => 
+        categories.map(cat =>
             prisma.notificationPreference.upsert({
                 where: { userId_category: { userId, category: cat.category } },
                 update: { pushEnabled: cat.pushEnabled, inAppEnabled: cat.inAppEnabled },
@@ -99,7 +96,15 @@ export const getNotificationsByUser = async (userId: string, options: Notificati
             take: limit,
         }),
         prisma.notification.count({ where }),
-        prisma.notification.count({ where: { userId, readAt: null } }),
+        prisma.notification.count({
+            where: {
+                userId,
+                readAt: null,
+                NOT: {
+                    dedupeKey: { startsWith: 'init_' }
+                }
+            }
+        }),
     ]);
 
     return {
